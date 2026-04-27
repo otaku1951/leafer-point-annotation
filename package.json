@@ -1,0 +1,61 @@
+{
+  "name": "@zzalai/leafer-point-annotation",
+  "version": "1.0.0",
+  "description": "Vue3 component for point annotation on images using LeaferJS",
+  "type": "module",
+  "publishConfig": {
+    "access": "public"
+  },
+  "main": "./dist/leafer-point-annotation.umd.js",
+  "module": "./dist/leafer-point-annotation.es.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "import": "./dist/leafer-point-annotation.es.js",
+      "require": "./dist/leafer-point-annotation.umd.js",
+      "types": "./dist/index.d.ts"
+    }
+  },
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview",
+    "type-check": "tsc --noEmit",
+    "docs:build": "vite build --config vite.docs.config.ts"
+  },
+  "keywords": [
+    "vue3",
+    "leaferjs",
+    "point",
+    "annotation",
+    "image-processing"
+  ],
+  "author": "zzalai",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/otaku1951/leafer-point-annotation.git"
+  },
+  "homepage": "https://otaku1951.github.io/leafer-point-annotation/",
+  "packageManager": "pnpm@10.33.0",
+  "peerDependencies": {
+    "vue": "^3.3.0"
+  },
+  "dependencies": {
+    "@leafer-in/editor": "^2.0.8",
+    "@leafer-in/resize": "^2.0.8",
+    "@leafer-in/view": "^2.0.8",
+    "@leafer-in/viewport": "^2.0.8",
+    "@zzalai/leafer-undo-redo": "1.0.3",
+    "leafer-ui": "^2.0.8",
+    "tinykeys": "^3.0.0"
+  },
+  "devDependencies": {
+    "@types/node": "^25.6.0",
+    "@vitejs/plugin-vue": "^6.0.6",
+    "terser": "^5.46.1",
+    "typescript": "^6.0.2",
+    "vite": "^8.0.8",
+    "vite-plugin-dts": "^3.0.0"
+  }
+}
