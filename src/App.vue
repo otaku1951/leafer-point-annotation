@@ -44,6 +44,12 @@
         />
         <button @click="triggerFileInput">Import Canvas JSON</button>
       </div>
+      
+      <div class="control-group">
+        <h3>Brush Mask Export</h3>
+        <button @click="exportMaskImage">Export Mask Image</button>
+        <button @click="clearBrush">Clear Brush</button>
+      </div>
     </div>
     
     <div class="output">
@@ -187,6 +193,43 @@ const importCanvasJSON = async (event: Event) => {
   }
   // 重置文件输入
   target.value = ''
+}
+
+// 导出Mask图片
+const exportMaskImage = () => {
+  if (pointAnnotation.value) {
+    const maskData = pointAnnotation.value.exportMaskImage()
+    if (maskData) {
+      // 创建图片并下载
+      const img = new Image()
+      img.onload = () => {
+        const canvas = document.createElement('canvas')
+        canvas.width = img.width
+        canvas.height = img.height
+        const ctx = canvas.getContext('2d')
+        if (ctx) {
+          ctx.drawImage(img, 0, 0)
+          const url = canvas.toDataURL('image/png')
+          const a = document.createElement('a')
+          a.href = url
+          a.download = 'brush-mask.png'
+          a.click()
+        }
+      }
+      img.src = maskData
+    } else {
+      alert('No brush data to export.')
+    }
+  }
+}
+
+// 清除笔刷
+const clearBrush = () => {
+  if (pointAnnotation.value) {
+    // 调用内部方法清除笔刷层
+    pointAnnotation.value.clearBrush?.()
+    alert('Brush cleared!')
+  }
 }
 </script>
 

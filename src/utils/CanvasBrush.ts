@@ -134,6 +134,6 @@ export class CanvasBrush {
   }
 
   public getImageData(): string {
-    return (this.canvas as any).JSON?.url || '';
+    return this.canvas.context.canvas.toDataURL('image/png');
   }
 }

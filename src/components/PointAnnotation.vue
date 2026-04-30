@@ -122,6 +122,7 @@
         :class="{ active: currentTool === 'brush' }"
         title="笔刷工具 (B)"
         @click="brushTool"
+        ref="brushButtonRef"
       >
         <svg
           xmlns="http://www.w3.org/2000/svg"
@@ -161,7 +162,7 @@
         <span class="hotkey-hint" v-if="showHotkeys">E</span>
       </button>
       <!-- 笔刷大小调整 -->
-      <div v-if="currentTool === 'brush' || currentTool === 'eraser'" class="size-control">
+      <!-- <div v-if="currentTool === 'brush' || currentTool === 'eraser'" class="size-control">
         <div class="size-label">大小</div>
         <input
           type="range"
@@ -171,7 +172,7 @@
           v-model="localBrushStyle.size"
         />
         <div class="size-value">{{ localBrushStyle.size }}</div>
-      </div>
+      </div> -->
       <button class="tool-button" title="撤销 (Ctrl+Z)" @click="undo">
         <svg
           xmlns="http://www.w3.org/2000/svg"
@@ -226,6 +227,15 @@
       </button>
     </div>
   </div>
+  
+  <!-- 笔刷样式配置面板 -->
+  <BrushStylePanel
+    :visible="showBrushPanel"
+    :brush-style="localBrushStyle"
+    :button-rect="brushButtonRect"
+    @close="closeBrushPanel"
+    @update="updateBrushStyle"
+  />
 </template>
 
 <script setup lang="ts">
@@ -251,6 +261,7 @@ import { tinykeys } from "tinykeys";
 
 import { PointAnnotationElement } from "@/elements/PointAnnotationElement";
 import { CanvasBrush } from "@/utils/CanvasBrush";
+import BrushStylePanel from "./BrushStylePanel.vue";
 import type { PointAnnotation, PointStyle, BrushStyle } from "@/types";
 import { DEFAULT_POINT_STYLE, DEFAULT_BRUSH_STYLE } from "@/types";
 
@@ -313,6 +324,11 @@ const isMouseOverCanvas = ref(false);
 const showHotkeys = ref(false);
 const currentTool = ref<"select" | "point" | "brush" | "eraser">("select");
 const zoomLevel = ref<number>(100);
+
+// 笔刷配置面板相关
+const brushButtonRef = ref<HTMLElement | undefined>(undefined);
+const showBrushPanel = ref(false);
+const brushButtonRect = ref<DOMRect | null>(null);
 
 // 点标注数据
 const pointAnnotations = ref<PointAnnotation[]>([]);
@@ -645,6 +661,8 @@ onUnmounted(() => {
 // 工具切换函数
 const selectTool = () => {
   currentTool.value = "select";
+  // 关闭笔刷配置面板
+  showBrushPanel.value = false;
   if (!app) return 
   app.editor.config.moveable = false
   app.editor.config.resizeable = false
@@ -655,6 +673,8 @@ const selectTool = () => {
 
 const pointTool = () => {
   currentTool.value = "point";
+  // 关闭笔刷配置面板
+  showBrushPanel.value = false;
   if (!app) return 
   app.editor.config.moveable = true
   app.editor.config.multipleSelect = false // 禁用多选
@@ -671,10 +691,32 @@ const brushTool = () => {
   app.editor.config.multipleSelect = false;
   // 启用笔刷 Canvas 的点击事件
   canvasBrush?.setPointerEvents(true);
+  // 显示配置面板
+  showBrushPanel.value = !showBrushPanel.value;
+  if (showBrushPanel.value) {
+    // 获取按钮位置
+    nextTick(() => {
+      if (brushButtonRef.value) {
+        brushButtonRect.value = brushButtonRef.value.getBoundingClientRect();
+      }
+    });
+  }
+};
+
+// 关闭笔刷配置面板
+const closeBrushPanel = () => {
+  showBrushPanel.value = false;
+};
+
+// 更新笔刷样式
+const updateBrushStyle = (style: Partial<BrushStyle>) => {
+  Object.assign(localBrushStyle.value, style);
 };
 
 const eraserTool = () => {
   currentTool.value = "eraser";
+  // 关闭笔刷配置面板
+  showBrushPanel.value = false;
   if (!app) return;
   // 切换到擦除模式时禁用编辑器
   app.editor.config.moveable = false;
