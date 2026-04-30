@@ -114,9 +114,9 @@ export const DEFAULT_POINT_STYLE: PointStyle = {
 // 默认笔刷样式
 export const DEFAULT_BRUSH_STYLE: BrushStyle = {
   color: 'rgba(255,0,0,1)',
-  opacity: 1,
-  size: 90,
+  opacity: 0.55,
+  size: 100,
   minSize: 50,
   maxSize: 150,
-  continuity: 20, // 默认连续性阈值：20像素
+  continuity: 28, // 默认连续性阈值：20像素
 };

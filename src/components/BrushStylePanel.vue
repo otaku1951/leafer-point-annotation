@@ -38,7 +38,7 @@
             v-model.number="localOpacity" 
             min="0.1" 
             max="1" 
-            step="0.1" 
+            step="0.01" 
           />
           <span class="config-value">{{ Math.round(localOpacity * 100) }}%</span>
         </div>
