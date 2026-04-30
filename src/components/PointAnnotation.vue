@@ -139,6 +139,39 @@
         </svg>
         <span class="hotkey-hint" v-if="showHotkeys">B</span>
       </button>
+      <button
+        class="tool-button"
+        :class="{ active: currentTool === 'eraser' }"
+        title="橡皮擦工具 (E)"
+        @click="eraserTool"
+      >
+        <svg
+          xmlns="http://www.w3.org/2000/svg"
+          width="20"
+          height="20"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          stroke-width="2"
+          stroke-linecap="round"
+          stroke-linejoin="round"
+        >
+          <path d="M20 20H7L3 16C2.4 15.4 2.4 14.4 3 13.8L13.8 3C14.4 2.4 15.4 2.4 16 3L21 8C21.6 8.6 21.6 9.6 21 10.2L10.2 21C9.6 21.6 8.6 21.6 8 21L3 16"></path>
+        </svg>
+        <span class="hotkey-hint" v-if="showHotkeys">E</span>
+      </button>
+      <!-- 笔刷大小调整 -->
+      <div v-if="currentTool === 'brush' || currentTool === 'eraser'" class="size-control">
+        <div class="size-label">大小</div>
+        <input
+          type="range"
+          class="size-slider"
+          :min="localBrushStyle.minSize"
+          :max="localBrushStyle.maxSize"
+          v-model="localBrushStyle.size"
+        />
+        <div class="size-value">{{ localBrushStyle.size }}</div>
+      </div>
       <button class="tool-button" title="撤销 (Ctrl+Z)" @click="undo">
         <svg
           xmlns="http://www.w3.org/2000/svg"
@@ -196,7 +229,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted, onUnmounted, nextTick } from "vue";
+import { ref, onMounted, onUnmounted, nextTick, computed, watch } from "vue";
 import {
   App,
   ImageEvent,
@@ -211,9 +244,15 @@ import "@leafer-in/editor";
 import "@leafer-in/resize";
 import "@leafer-in/viewport";
 import "@leafer-in/view";
+import { EditorEvent } from '@leafer-in/editor'
 
 // @ts-ignore - tinykeys 类型声明问题
 import { tinykeys } from "tinykeys";
+
+import { PointAnnotationElement } from "@/elements/PointAnnotationElement";
+import { CanvasBrush } from "@/utils/CanvasBrush";
+import type { PointAnnotation, PointStyle, BrushStyle } from "@/types";
+import { DEFAULT_POINT_STYLE, DEFAULT_BRUSH_STYLE } from "@/types";
 
 // Props
 export interface ImageSource {
@@ -229,6 +268,7 @@ export interface OptionsSource {
     width: number;
     height: number;
   };
+  brushStyle?: BrushStyle;
   selectedPointStyle?: {
     fill: string;
     stroke: string;
@@ -265,13 +305,59 @@ const imageHeight = ref<number | null>(null);
 let app: App | null = null;
 let imageBox: Image | null = null;
 const contentLayer = new Group({ name: "contentLayer" });
+const pointLayer = new Group({ name: "pointLayer" });
 
 const mousePosition = ref({ x: 0, y: 0 });
 const isCanvasFocused = ref(false);
 const isMouseOverCanvas = ref(false);
 const showHotkeys = ref(false);
-const currentTool = ref<"select" | "point" | "brush">("select");
+const currentTool = ref<"select" | "point" | "brush" | "eraser">("select");
 const zoomLevel = ref<number>(100);
+
+// 点标注数据
+const pointAnnotations = ref<PointAnnotation[]>([]);
+const pointCounter = ref(1);
+
+// 点标注样式配置
+const pointStyle = computed<PointStyle>(() => ({
+  ...DEFAULT_POINT_STYLE,
+  ...props.options?.pointStyle,
+}));
+
+// 笔刷样式配置
+const brushStyle = computed<BrushStyle>(() => ({
+  ...DEFAULT_BRUSH_STYLE,
+  ...props.options?.brushStyle,
+}));
+
+// 本地响应式笔刷状态（用于滑块调整）
+const localBrushStyle = ref<BrushStyle>({
+  ...DEFAULT_BRUSH_STYLE,
+  ...props.options?.brushStyle,
+});
+
+// 监听 prop 变化，同步到本地状态
+watch(brushStyle, (newVal: BrushStyle) => {
+  localBrushStyle.value = { ...newVal };
+}, { immediate: true });
+
+// 笔刷相关状态
+let canvasBrush: CanvasBrush | null = null;
+const isDrawing = ref(false);
+
+// 根据配置强制【标注点】不跟随画布Scale变化
+const changePointScaleRelativeCanvas = (pointAnnotationLayer: Group | null) => {
+  // 检查是否开启固定大小功能
+  if (!pointStyle.value.fixedSizeOnZoom) return;
+  
+  if (pointAnnotationLayer && pointAnnotationLayer.children && pointAnnotationLayer.children.length) {
+    const _scaleX = app?.tree.scaleX || 1;
+    const scaleFactor = pointStyle.value.fixedSizeScale || 1;
+    pointAnnotationLayer.children.forEach(element => {
+      element.scale = scaleFactor / _scaleX;
+    });
+  }
+}
 
 const initCanvas = () => {
   app = new App({
@@ -283,9 +369,6 @@ const initCanvas = () => {
     editor: {
       rotateable: false,
       middlePoint: {},
-      selectedStyle: {
-        ...props.options.selectedPointStyle,
-      }
     },
     tree: {
       type: "design",
@@ -293,11 +376,24 @@ const initCanvas = () => {
   });
 
   app?.tree.add(contentLayer);
+  app?.tree.add(pointLayer);
+
+  // 设置图层的 zIndex
+  pointLayer.zIndex = 10;
 
   if (app) {
     app.on(ZoomEvent.ZOOM, () => {
       updateZoomLevel();
     });
+
+    // 监听画布点击事件，用于创建点标注
+    app.on(PointerEvent.TAP, handleCanvasTap);
+    app.editor.on(EditorEvent.SELECT, handlePointAnnotationSelected);
+
+    // 笔刷绘制事件
+    app.on(PointerEvent.DOWN, handleBrushDown);
+    app.on(PointerEvent.MOVE, handleBrushMove);
+    app.on(PointerEvent.UP, handleBrushUp);
   }
 };
 
@@ -349,6 +445,7 @@ const loadImage = async (imageSrc?: string | undefined) => {
       loadStatus.value = "success";
       emit("loadSuccess");
       fitImageToCanvas();
+      initBrushLayer();
     });
 
     imageBox.on(ImageEvent.ERROR, function (e: ImageEvent) {
@@ -365,7 +462,8 @@ const loadImage = async (imageSrc?: string | undefined) => {
   }
 };
 
-interface PointAnnotation {
+// 点标注数据结构（内部使用）
+interface PointAnnotationInternal {
   id: string;
   x: number;
   y: number;
@@ -374,10 +472,6 @@ interface PointAnnotation {
     y: number;
   };
 }
-
-const getPointAnnotations = (): PointAnnotation[] => {
-  return [];
-};
 
 const getImageInfo = () => {
   return {
@@ -390,6 +484,12 @@ const getImageInfo = () => {
 
 const exportCanvasJSON = (): string => {
   return JSON.stringify({});
+};
+
+// 导出二值图（Mask）
+const exportMaskImage = (): string | null => {
+  if (!canvasBrush) return null;
+  return canvasBrush.getImageData();
 };
 
 const importCanvasJSON = async (
@@ -422,6 +522,11 @@ onMounted(() => {
         if (!isCanvasFocused.value && !isMouseOverCanvas.value) return;
         event.preventDefault();
         brushTool();
+      },
+      e: (event: KeyboardEvent) => {
+        if (!isCanvasFocused.value && !isMouseOverCanvas.value) return;
+        event.preventDefault();
+        eraserTool();
       },
       "$mod+KeyZ": (event: KeyboardEvent) => {
         if (!isCanvasFocused.value && !isMouseOverCanvas.value) return;
@@ -537,16 +642,291 @@ onUnmounted(() => {
   }
 });
 
+// 工具切换函数
 const selectTool = () => {
   currentTool.value = "select";
+  if (!app) return 
+  app.editor.config.moveable = false
+  app.editor.config.resizeable = false
+  app.editor.config.multipleSelect = true // 启用多选
+  // 禁用笔刷 Canvas 的点击事件，让点击穿透到图片
+  canvasBrush?.setPointerEvents(false);
 };
 
 const pointTool = () => {
   currentTool.value = "point";
+  if (!app) return 
+  app.editor.config.moveable = true
+  app.editor.config.multipleSelect = false // 禁用多选
+  // 禁用笔刷 Canvas 的点击事件，让点击穿透到图片
+  canvasBrush?.setPointerEvents(false);
 };
 
 const brushTool = () => {
   currentTool.value = "brush";
+  if (!app) return;
+  // 切换到笔刷模式时禁用编辑器
+  app.editor.config.moveable = false;
+  app.editor.config.resizeable = false;
+  app.editor.config.multipleSelect = false;
+  // 启用笔刷 Canvas 的点击事件
+  canvasBrush?.setPointerEvents(true);
+};
+
+const eraserTool = () => {
+  currentTool.value = "eraser";
+  if (!app) return;
+  // 切换到擦除模式时禁用编辑器
+  app.editor.config.moveable = false;
+  app.editor.config.resizeable = false;
+  app.editor.config.multipleSelect = false;
+  // 启用笔刷 Canvas 的点击事件
+  canvasBrush?.setPointerEvents(true);
+};
+
+// 初始化笔刷图层（在图片加载后调用）
+const initBrushLayer = () => {
+  if (!imageWidth.value || !imageHeight.value || !app) return;
+
+  // 清除旧的笔刷
+  if (canvasBrush) {
+    canvasBrush.getCanvas().remove();
+  }
+
+  // 创建新的 CanvasBrush 实例
+  canvasBrush = new CanvasBrush(
+    imageWidth.value,
+    imageHeight.value,
+    localBrushStyle.value
+  );
+
+  // 将 LeaferJS Canvas 添加到 contentLayer
+  contentLayer.add(canvasBrush.getCanvas());
+};
+
+// 笔刷绘制事件处理
+const handleBrushDown = (e: any) => {
+  if (currentTool.value !== 'brush' && currentTool.value !== 'eraser') return;
+  if (!app || !imageBox || !canvasBrush) return;
+
+  isDrawing.value = true;
+
+  // 获取相对于图片的坐标（与点标注相同的方式）
+  const point = contentLayer.getBoxPoint({ x: e.x, y: e.y });
+
+  // 判断是否为擦除模式
+  const isErase = currentTool.value === 'eraser';
+
+  // 根据模式绘制
+  if (isErase) {
+    canvasBrush.erase(point.x, point.y, localBrushStyle.value.size, localBrushStyle.value.continuity);
+  } else {
+    canvasBrush.draw(
+      point.x,
+      point.y,
+      localBrushStyle.value.size,
+      localBrushStyle.value.color,
+      localBrushStyle.value.opacity,
+      localBrushStyle.value.continuity
+    );
+  }
+
+  // 触发 Canvas 重绘
+  canvasBrush.getCanvas().paint();
+};
+
+const handleBrushMove = (e: any) => {
+  if (!isDrawing.value || !canvasBrush || !imageBox) return;
+
+  // 获取相对于图片的坐标（与点标注相同的方式）
+  const point = contentLayer.getBoxPoint({ x: e.x, y: e.y });
+
+  // 判断是否为擦除模式
+  const isErase = currentTool.value === 'eraser';
+
+  // 根据模式绘制
+  if (isErase) {
+    canvasBrush.erase(point.x, point.y, localBrushStyle.value.size, localBrushStyle.value.continuity);
+  } else {
+    canvasBrush.draw(
+      point.x,
+      point.y,
+      localBrushStyle.value.size,
+      localBrushStyle.value.color,
+      localBrushStyle.value.opacity,
+      localBrushStyle.value.continuity
+    );
+  }
+
+  // 触发 Canvas 重绘
+  canvasBrush.getCanvas().paint();
+};
+
+const handleBrushUp = () => {
+  isDrawing.value = false;
+  // 重置上一个点，避免下次绘制时从上次结束的地方连线
+  canvasBrush?.resetLastPoint();
+};
+
+// 生成 UUID
+const generateUUID = (): string => {
+  return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function(c) {
+    const r = Math.random() * 16 | 0;
+    const v = c === 'x' ? r : (r & 0x3 | 0x8);
+    return v.toString(16);
+  });
+};
+
+// 处理画布点击事件
+const handleCanvasTap = (e: any) => {
+  if (currentTool.value !== 'point' || !app || !imageBox) return;
+
+  // 检查是否点击在点标注元素上（避免重复点击）
+  if (e.target && e.target._element_tag === 'point-annotation') return;
+
+  // 获取相对于 contentLayer 的坐标
+  const point = contentLayer.getBoxPoint({ x: e.x, y: e.y });
+
+  // 检查是否在图片范围内
+  if (point.x < 0 || point.x > (imageWidth.value || 0) ||
+      point.y < 0 || point.y > (imageHeight.value || 0)) {
+    return;
+  }
+
+  // 创建点标注
+  createPointAnnotation(point.x, point.y);
+};
+
+// 处理点击【标注点】选中样式
+const handlePointAnnotationSelected = (e: any) => {
+  // console.log(e)
+  if (e.value) {
+    if (Array.isArray(e.value)) {
+      e.value.forEach((element: { circle: { set: (arg0: { fill: string; stroke: string; }) => void; }; }) => {
+        if (!element.circle) return
+        element.circle.set({
+          fill: pointStyle.value.selectedCircleFill,
+          stroke: pointStyle.value.selectedCircleStroke
+        })
+      });
+    } else {
+      const _target = e.value.circle || e.value.parent.circle
+      if (!_target) return
+      _target.set({
+        fill: pointStyle.value.selectedCircleFill,
+        stroke: pointStyle.value.selectedCircleStroke
+      })
+    }
+  }
+  if (e.oldValue && (!Array.isArray(e.oldValue) || !e.value)) {
+    if (Array.isArray(e.oldValue)) {
+      e.oldValue.forEach((element: { circle: { set: (arg0: { fill: string; stroke: string; }) => void; }; }) => {
+        if (!element.circle) return
+        element.circle.set({
+          fill: pointStyle.value.circleFill,
+          stroke: pointStyle.value.circleStroke
+        })
+      });
+    } else {
+      const _target = e.oldValue.circle || e.oldValue.parent.circle
+      if (!_target || (e.oldValue === e.value?.parent)) return
+      _target.set({
+        fill: pointStyle.value.circleFill,
+        stroke: pointStyle.value.circleStroke
+      })
+    }
+  }
+}
+
+// 创建点标注
+const createPointAnnotation = (pixelX: number, pixelY: number) => {
+  if (!imageWidth.value || !imageHeight.value) return;
+
+  const id = `point_${generateUUID()}`;
+  const label = `#${pointCounter.value}`;
+
+  // 计算归一化坐标
+  const normalizedX = pixelX / imageWidth.value;
+  const normalizedY = pixelY / imageHeight.value;
+
+  const pointData: PointAnnotation = {
+    id,
+    pixel: { x: pixelX, y: pixelY },
+    normalized: { x: normalizedX, y: normalizedY },
+    label,
+    createdAt: Date.now(),
+    updatedAt: Date.now(),
+  };
+
+  // 创建点标注元素
+  const pointElement = new PointAnnotationElement(pointData, pointStyle.value);
+
+  // 添加到图层
+  pointLayer.add(pointElement);
+
+  // 强制【标注点】不跟随画布Scale变化
+  changePointScaleRelativeCanvas(pointLayer);
+
+  // 更新数据
+  pointAnnotations.value.push(pointData);
+  pointCounter.value++;
+
+  // 触发事件
+  emit("pointChange", [...pointAnnotations.value]);
+
+  // 选中新创建的点
+  if (app?.editor) {
+    app.editor.select(pointElement);
+  }
+};
+
+// 删除选中的点标注或清除笔刷内容
+const deleteSelected = () => {
+  // 如果当前工具是笔刷，清除所有笔刷内容
+  if (currentTool.value === 'brush' || currentTool.value === 'eraser') {
+    clearBrush();
+    return;
+  }
+  
+  if (!app?.editor) return;
+
+  const selected = app.editor.list;
+  if (selected.length === 0) return;
+
+  selected.forEach((element: any) => {
+    // 使用 _element_tag 来识别点标注元素
+    if (element._element_tag === 'point-annotation') {
+      // 从数据数组中移除
+      const index = pointAnnotations.value.findIndex(p => p.id === element.data.id);
+      if (index > -1) {
+        pointAnnotations.value.splice(index, 1);
+      }
+
+      // 从图层中移除
+      pointLayer.remove(element);
+      element.destroy();
+    }
+  });
+
+  // 清除编辑器选择
+  app.editor.cancel();
+
+  // 触发事件
+  emit("pointChange", [...pointAnnotations.value]);
+};
+
+// 清除所有笔刷内容
+const clearBrush = () => {
+  if (canvasBrush) {
+    canvasBrush.clear();
+    // 触发 Canvas 重绘
+    canvasBrush.getCanvas().paint();
+  }
+};
+
+// 获取点标注数据
+const getPointAnnotations = (): PointAnnotation[] => {
+  return [...pointAnnotations.value];
 };
 
 const undo = () => {
@@ -555,10 +935,6 @@ const undo = () => {
 
 const redo = () => {
   // TODO: implement redo
-};
-
-const deleteSelected = () => {
-  // TODO: implement delete
 };
 
 const zoomOut = () => {
@@ -582,14 +958,18 @@ const resetZoom = () => {
 const updateZoomLevel = () => {
   if (!app || !app.tree || app.tree.scaleX === undefined) return;
   zoomLevel.value = Math.round(app.tree.scaleX * 100);
+  // 强制【标注点】不跟随画布Scale变化
+  changePointScaleRelativeCanvas(pointLayer);
 };
 
 defineExpose({
   getPointAnnotations,
   getImageInfo,
   exportCanvasJSON,
+  exportMaskImage,
   importCanvasJSON,
   loadImage,
+  clearBrush,
 });
 
 declare global {
@@ -858,5 +1238,85 @@ declare global {
   border-radius: var(--leafer-point-border-radius-hotkey);
   pointer-events: none;
   white-space: nowrap;
+}
+
+.size-control {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: var(--leafer-point-padding-tool-button);
+  background-color: var(--leafer-point-color-white);
+  border-radius: var(--leafer-point-border-radius-tool-button);
+  box-shadow: var(--leafer-point-shadow-tool-button);
+}
+
+.size-label {
+  font-size: 12px;
+  color: var(--leafer-point-color-text);
+  white-space: nowrap;
+}
+
+.size-slider {
+  width: 120px;
+  height: 8px;
+  background: #e0e0e0;
+  border-radius: 4px;
+  outline: none;
+  -webkit-appearance: none;
+  appearance: none;
+  cursor: pointer;
+}
+
+.size-slider::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 18px;
+  height: 18px;
+  background: var(--leafer-point-color-primary);
+  border-radius: 50%;
+  cursor: pointer;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.3);
+  transition: all var(--leafer-point-transition-time) ease;
+  border: 2px solid white;
+}
+
+.size-slider::-webkit-slider-thumb:hover,
+.size-slider::-webkit-slider-thumb:active,
+.size-slider:focus::-webkit-slider-thumb {
+  transform: scale(1.15);
+  background: var(--leafer-point-color-primary-hover);
+  box-shadow: 0 3px 8px rgba(0, 0, 0, 0.4);
+}
+
+.size-slider::-moz-range-thumb {
+  width: 18px;
+  height: 18px;
+  background: var(--leafer-point-color-primary);
+  border-radius: 50%;
+  cursor: pointer;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.3);
+  border: none;
+  border: 2px solid white;
+  transition: all var(--leafer-point-transition-time) ease;
+}
+
+.size-slider::-moz-range-thumb:hover,
+.size-slider::-moz-range-thumb:active,
+.size-slider:focus::-moz-range-thumb {
+  transform: scale(1.15);
+  background: var(--leafer-point-color-primary-hover);
+  box-shadow: 0 3px 8px rgba(0, 0, 0, 0.4);
+}
+
+.size-slider:focus {
+  outline: none;
+}
+
+.size-value {
+  min-width: 30px;
+  text-align: center;
+  font-size: 12px;
+  color: var(--leafer-point-color-primary);
+  font-weight: 600;
 }
 </style>

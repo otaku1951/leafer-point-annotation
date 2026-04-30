@@ -75,6 +75,8 @@ const editorOptions = ref({
     fill: '#f00',
     stroke: '#fff',
     strokeWidth: 2,
+    width: 16,
+    height: 16,
     radius: 8
   },
   selectedPointStyle: {

@@ -44,11 +44,14 @@
   "dependencies": {
     "@leafer-in/editor": "^2.0.8",
     "@leafer-in/resize": "^2.0.8",
+    "@leafer-in/state": "^2.1.0",
+    "@leafer-in/text-editor": "^2.1.0",
     "@leafer-in/view": "^2.0.8",
     "@leafer-in/viewport": "^2.0.8",
     "@zzalai/leafer-undo-redo": "1.0.3",
     "leafer-ui": "^2.0.8",
-    "tinykeys": "^3.0.0"
+    "tinykeys": "^3.0.0",
+    "vue-pick-colors": "^1.8.0"
   },
   "devDependencies": {
     "@types/node": "^25.6.0",
