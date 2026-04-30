@@ -1,4 +1,4 @@
-import { Canvas } from 'leafer-ui';
+import { Canvas, Group } from 'leafer-ui';
 
 export interface BrushStyle {
   color: string;
@@ -11,11 +11,12 @@ export interface BrushStyle {
 
 export class CanvasBrush {
   private canvas: Canvas;
+  private group: Group;
   private width: number;
   private height: number;
   private lastPoint: { x: number; y: number } | null = null;
 
-  constructor(width: number, height: number, _style: BrushStyle) {
+  constructor(width: number, height: number, style: BrushStyle) {
     this.width = width;
     this.height = height;
 
@@ -25,10 +26,24 @@ export class CanvasBrush {
     });
     // 默认禁用点击事件，让点击穿透到图片
     (this.canvas as any).set({ pointerEvents: false });
+    
+    // 外层 Group，用于设置统一透明度
+    this.group = new Group({
+      opacity: style.opacity,
+    });
+    this.group.add(this.canvas);
   }
 
   public getCanvas(): Canvas {
     return this.canvas;
+  }
+
+  public getGroup(): Group {
+    return this.group;
+  }
+
+  public setOpacity(opacity: number): void {
+    this.group.set({ opacity });
   }
 
   public setPointerEvents(value: boolean): void {
@@ -44,7 +59,7 @@ export class CanvasBrush {
     y: number,
     size: number,
     color: string,
-    opacity: number,
+    _opacity: number,
     continuity: number
   ): void {
     const { context } = this.canvas;
@@ -53,7 +68,7 @@ export class CanvasBrush {
     context.save();
     
     context.fillStyle = color;
-    context.globalAlpha = opacity;
+    context.globalAlpha = 1;  // 始终 1，透明度由 Group 控制
 
     // 如果有上一个点，且两点之间距离超过连续性阈值，先画连线
     if (this.lastPoint) {

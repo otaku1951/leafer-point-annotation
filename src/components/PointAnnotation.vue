@@ -357,6 +357,16 @@ watch(brushStyle, (newVal: BrushStyle) => {
   localBrushStyle.value = { ...newVal };
 }, { immediate: true });
 
+// 监听笔刷透明度变化，更新 CanvasBrush 的 Group 透明度
+watch(
+  () => localBrushStyle.value.opacity,
+  (newOpacity) => {
+    if (canvasBrush) {
+      canvasBrush.setOpacity(newOpacity);
+    }
+  }
+);
+
 // 笔刷相关状态
 let canvasBrush: CanvasBrush | null = null;
 const isDrawing = ref(false);
@@ -732,7 +742,7 @@ const initBrushLayer = () => {
 
   // 清除旧的笔刷
   if (canvasBrush) {
-    canvasBrush.getCanvas().remove();
+    canvasBrush.getGroup().remove();
   }
 
   // 创建新的 CanvasBrush 实例
@@ -742,8 +752,8 @@ const initBrushLayer = () => {
     localBrushStyle.value
   );
 
-  // 将 LeaferJS Canvas 添加到 contentLayer
-  contentLayer.add(canvasBrush.getCanvas());
+  // 将 LeaferJS Group 添加到 contentLayer
+  contentLayer.add(canvasBrush.getGroup());
 };
 
 // 笔刷绘制事件处理
