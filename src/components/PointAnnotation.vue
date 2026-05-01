@@ -1089,8 +1089,8 @@ const handlePointAnnotationSelected = (e: any) => {
 }
 
 // 创建点标注
-const createPointAnnotation = (pixelX: number, pixelY: number) => {
-  if (!imageWidth.value || !imageHeight.value) return;
+const createPointAnnotation = (pixelX: number, pixelY: number): string | null => {
+  if (!imageWidth.value || !imageHeight.value) return null;
 
   const id = `point_${generateUUID()}`;
   const label = `#${pointCounter.value}`;
@@ -1137,6 +1137,8 @@ const createPointAnnotation = (pixelX: number, pixelY: number) => {
   if (app?.editor) {
     app.editor.select(pointElement);
   }
+
+  return id;
 };
 
 // 删除选中的点标注或清除笔刷内容
@@ -1208,6 +1210,34 @@ const redo = () => {
   }
 };
 
+const getCurrentTool = (): "select" | "point" | "brush" | "eraser" => {
+  return currentTool.value;
+};
+
+const setTool = (tool: "select" | "point" | "brush" | "eraser") => {
+  currentTool.value = tool;
+};
+
+const removePointAnnotation = (id: string): boolean => {
+  const index = pointAnnotations.value.findIndex(p => p.id === id);
+  if (index === -1) return false;
+
+  const element = pointLayer.children[index];
+  if (!element) return false;
+
+  if (commandManager) {
+    const removeCommand = new RemovePointCommand(pointLayer, element as any, pointAnnotations.value);
+    commandManager.executeCommand(removeCommand);
+  } else {
+    pointLayer.remove(element);
+    element.destroy();
+    pointAnnotations.value.splice(index, 1);
+  }
+
+  emit("pointChange", [...pointAnnotations.value]);
+  return true;
+};
+
 const zoomOut = () => {
   if (!app) return;
   app.tree.zoom("out");
@@ -1246,6 +1276,12 @@ defineExpose({
   zoomIn,
   zoomOut,
   resetZoom,
+  undo,
+  redo,
+  getCurrentTool,
+  setTool,
+  createPointAnnotation,
+  removePointAnnotation,
 });
 
 declare global {

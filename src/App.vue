@@ -72,6 +72,31 @@
         <button @click="exportCOCO">Export COCO JSON</button>
         <button @click="exportYOLO">Export YOLO</button>
       </div>
+
+      <div class="control-group">
+        <h3>API Methods</h3>
+        <div class="api-row">
+          <button @click="testUndo">Undo</button>
+          <button @click="testRedo">Redo</button>
+        </div>
+        <div class="api-row">
+          <label>Tool:</label>
+          <select v-model="currentTool">
+            <option value="select">Select</option>
+            <option value="point">Point</option>
+            <option value="brush">Brush</option>
+            <option value="eraser">Eraser</option>
+          </select>
+          <button @click="callSetTool">Set Tool</button>
+        </div>
+        <div class="api-row">
+          <button @click="testAddPoint">Add Point (100,100)</button>
+          <button @click="testRemovePoint">Remove Last Point</button>
+        </div>
+        <div class="api-row">
+          <span>Current Tool: {{ currentToolDisplay }}</span>
+        </div>
+      </div>
     </div>
     
     <div class="output">
@@ -121,6 +146,9 @@ const pointData = ref('')
 const pointAnnotation = ref<InstanceType<typeof PointAnnotation> | null>(null)
 const maskFormat = ref<'png' | 'jpeg'>('png')
 const maskForeground = ref<'black' | 'white'>('black')
+const currentTool = ref<'select' | 'point' | 'brush' | 'eraser'>('select')
+const currentToolDisplay = ref('select')
+const lastAddedPointId = ref<string | null>(null)
 
 // 处理点变化
 const handlePointChange = (data: any) => {
@@ -274,9 +302,59 @@ const exportYOLO = () => {
 // 清除笔刷
 const clearBrush = () => {
   if (pointAnnotation.value) {
-    // 调用内部方法清除笔刷层
     pointAnnotation.value.clearBrush?.()
     alert('Brush cleared!')
+  }
+}
+
+// API 测试方法
+const testUndo = () => {
+  if (pointAnnotation.value) {
+    pointAnnotation.value.undo()
+  }
+}
+
+const testRedo = () => {
+  if (pointAnnotation.value) {
+    pointAnnotation.value.redo()
+  }
+}
+
+const callSetTool = () => {
+  if (pointAnnotation.value) {
+    pointAnnotation.value.setTool(currentTool.value)
+    currentToolDisplay.value = currentTool.value
+  }
+}
+
+const testAddPoint = () => {
+  if (pointAnnotation.value) {
+    const id = pointAnnotation.value.createPointAnnotation(100, 100)
+    if (id) {
+      lastAddedPointId.value = id
+      alert(`Point added with id: ${id}`)
+    }
+  }
+}
+
+const testRemovePoint = () => {
+  if (pointAnnotation.value && lastAddedPointId.value) {
+    const success = pointAnnotation.value.removePointAnnotation(lastAddedPointId.value)
+    if (success) {
+      lastAddedPointId.value = null
+      alert('Point removed')
+    }
+  } else {
+    const points = pointAnnotation.value?.getPointAnnotations()
+    if (points && points.length > 0) {
+      const lastPoint = points[points.length - 1]
+      const success = pointAnnotation.value?.removePointAnnotation(lastPoint.id)
+      if (success) {
+        alert('Last point removed')
+      }
+    } else {
+      alert('No points to remove')
+    }
   }
 }
 </script>
