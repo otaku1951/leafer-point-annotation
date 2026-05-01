@@ -146,9 +146,24 @@ export class CanvasBrush {
     const { context } = this.canvas;
     context.clearRect(0, 0, this.width, this.height);
     this.resetLastPoint();
+    this.canvas.paint();
+    this.group.set({ dirty: true });
   }
 
   public getImageData(): string {
     return this.canvas.context.canvas.toDataURL('image/png');
+  }
+
+  public restoreImageData(dataUrl: string, callback?: () => void): void {
+    const img = new Image();
+    img.onload = () => {
+      const { context } = this.canvas;
+      context.clearRect(0, 0, this.width, this.height);
+      context.drawImage(img, 0, 0);
+      this.canvas.paint();
+      this.group.set({ dirty: true });
+      if (callback) callback();
+    };
+    img.src = dataUrl;
   }
 }

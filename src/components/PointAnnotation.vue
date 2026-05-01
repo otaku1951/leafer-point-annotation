@@ -255,6 +255,9 @@ import "@leafer-in/resize";
 import "@leafer-in/viewport";
 import "@leafer-in/view";
 import { EditorEvent } from '@leafer-in/editor'
+import { CommandManager } from '@zzalai/leafer-undo-redo'
+import { AddPointCommand, RemovePointCommand } from '@/utils/PointCommands';
+import { BrushSnapshotCommand } from '@/utils/BrushCommands';
 
 // @ts-ignore - tinykeys 类型声明问题
 import { tinykeys } from "tinykeys";
@@ -370,6 +373,9 @@ watch(
 // 笔刷相关状态
 let canvasBrush: CanvasBrush | null = null;
 const isDrawing = ref(false);
+
+// 撤销/重做管理器
+let commandManager: CommandManager | null = null;
 
 // 根据配置强制【标注点】不跟随画布Scale变化
 const changePointScaleRelativeCanvas = (pointAnnotationLayer: Group | null) => {
@@ -529,6 +535,9 @@ onMounted(() => {
   nextTick(() => {
     initCanvas();
     loadImage();
+
+    // 初始化撤销/重做管理器
+    commandManager = new CommandManager(100);
 
     window.addEventListener("keydown", handleKeyDown);
     window.addEventListener("mousemove", handleMouseMove);
@@ -789,11 +798,18 @@ const initBrushLayer = () => {
 };
 
 // 笔刷绘制事件处理
+let brushSnapshotBeforeDraw: string | null = null;
+
 const handleBrushDown = (e: any) => {
   if (currentTool.value !== 'brush' && currentTool.value !== 'eraser') return;
   if (!app || !imageBox || !canvasBrush) return;
 
   isDrawing.value = true;
+
+  // 保存当前画布快照（用于撤销）
+  if (commandManager) {
+    brushSnapshotBeforeDraw = canvasBrush.getImageData();
+  }
 
   // 获取相对于图片的坐标（与点标注相同的方式）
   const point = contentLayer.getBoxPoint({ x: e.x, y: e.y });
@@ -848,6 +864,14 @@ const handleBrushMove = (e: any) => {
 
 const handleBrushUp = () => {
   isDrawing.value = false;
+
+  // 如果有保存的快照，创建撤销命令
+  if (commandManager && canvasBrush && brushSnapshotBeforeDraw) {
+    const snapshotCommand = new BrushSnapshotCommand(canvasBrush, brushSnapshotBeforeDraw);
+    commandManager.executeCommand(snapshotCommand);
+    brushSnapshotBeforeDraw = null;
+  }
+
   // 重置上一个点，避免下次绘制时从上次结束的地方连线
   canvasBrush?.resetLastPoint();
 };
@@ -958,14 +982,18 @@ const createPointAnnotation = (pixelX: number, pixelY: number) => {
     pointElement.label.editable = false;
   }
 
-  // 添加到图层
-  pointLayer.add(pointElement);
+  // 使用命令模式添加到图层
+  if (commandManager) {
+    const addCommand = new AddPointCommand(pointLayer, pointElement, pointAnnotations.value, pointData);
+    commandManager.executeCommand(addCommand);
+  } else {
+    pointLayer.add(pointElement);
+    pointAnnotations.value.push(pointData);
+  }
 
   // 强制【标注点】不跟随画布Scale变化
   changePointScaleRelativeCanvas(pointLayer);
 
-  // 更新数据
-  pointAnnotations.value.push(pointData);
   pointCounter.value++;
 
   // 触发事件
@@ -984,7 +1012,7 @@ const deleteSelected = () => {
     clearBrush();
     return;
   }
-  
+
   if (!app?.editor) return;
 
   const selected = app.editor.list;
@@ -993,15 +1021,18 @@ const deleteSelected = () => {
   selected.forEach((element: any) => {
     // 使用 _element_tag 来识别点标注元素
     if (element._element_tag === 'point-annotation') {
-      // 从数据数组中移除
-      const index = pointAnnotations.value.findIndex(p => p.id === element.data.id);
-      if (index > -1) {
-        pointAnnotations.value.splice(index, 1);
+      // 使用命令模式从图层和数据中移除
+      if (commandManager) {
+        const removeCommand = new RemovePointCommand(pointLayer, element, pointAnnotations.value);
+        commandManager.executeCommand(removeCommand);
+      } else {
+        pointLayer.remove(element);
+        element.destroy();
+        const index = pointAnnotations.value.findIndex(p => p.id === element.data.id);
+        if (index > -1) {
+          pointAnnotations.value.splice(index, 1);
+        }
       }
-
-      // 从图层中移除
-      pointLayer.remove(element);
-      element.destroy();
     }
   });
 
@@ -1015,8 +1046,13 @@ const deleteSelected = () => {
 // 清除所有笔刷内容
 const clearBrush = () => {
   if (canvasBrush) {
+    if (commandManager) {
+      const beforeSnapshot = canvasBrush.getImageData();
+      const snapshotCommand = new BrushSnapshotCommand(canvasBrush, beforeSnapshot, true);
+      commandManager.executeCommand(snapshotCommand);
+    }
+
     canvasBrush.clear();
-    // 触发 Canvas 重绘
     canvasBrush.getCanvas().paint();
   }
 };
@@ -1027,11 +1063,15 @@ const getPointAnnotations = (): PointAnnotation[] => {
 };
 
 const undo = () => {
-  // TODO: implement undo
+  if (commandManager?.canUndo()) {
+    commandManager.undo();
+  }
 };
 
 const redo = () => {
-  // TODO: implement redo
+  if (commandManager?.canRedo()) {
+    commandManager.redo();
+  }
 };
 
 const zoomOut = () => {
