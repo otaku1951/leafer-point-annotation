@@ -246,9 +246,7 @@ import {
   PointerEvent,
   ZoomEvent,
   Image,
-  Rect,
   Group,
-  DragEvent,
 } from "leafer-ui";
 import "@leafer-in/editor";
 import "@leafer-in/resize";
@@ -258,6 +256,8 @@ import { EditorEvent } from '@leafer-in/editor'
 import { CommandManager } from '@zzalai/leafer-undo-redo'
 import { AddPointCommand, RemovePointCommand } from '@/utils/PointCommands';
 import { BrushSnapshotCommand } from '@/utils/BrushCommands';
+import { exportCOCOFormat } from '@/utils/COCOExporter';
+import { exportYOLOFormat } from '@/utils/YOLOExporter';
 
 // @ts-ignore - tinykeys 类型声明问题
 import { tinykeys } from "tinykeys";
@@ -290,6 +290,8 @@ export interface OptionsSource {
   };
   maxPoints?: number;
   maxUndoSteps?: number;
+  maskExportFormat?: 'png' | 'jpeg' | 'jpg';
+  maskExportForeground?: 'black' | 'white';
 }
 
 const props = defineProps({
@@ -495,15 +497,7 @@ const loadImage = async (imageSrc?: string | undefined) => {
 };
 
 // 点标注数据结构（内部使用）
-interface PointAnnotationInternal {
-  id: string;
-  x: number;
-  y: number;
-  normalized: {
-    x: number;
-    y: number;
-  };
-}
+
 
 const getImageInfo = () => {
   return {
@@ -515,20 +509,160 @@ const getImageInfo = () => {
 };
 
 const exportCanvasJSON = (): string => {
-  return JSON.stringify({});
+  const exportData = {
+    version: '1.0',
+    imageUrl: props.imageSource.url || '',
+    imageWidth: imageWidth.value,
+    imageHeight: imageHeight.value,
+    pointAnnotations: [...pointAnnotations.value],
+    brushMask: canvasBrush?.getImageData() || null,
+    exportTime: Date.now(),
+  };
+  return JSON.stringify(exportData, null, 2);
 };
 
 // 导出二值图（Mask）
-const exportMaskImage = (): string | null => {
-  if (!canvasBrush) return null;
-  return canvasBrush.getImageData();
+const exportMaskImage = (format?: 'png' | 'jpeg' | 'jpg', foregroundColor?: 'black' | 'white'): Promise<string | null> => {
+  return new Promise((resolve) => {
+    if (!canvasBrush) {
+      resolve(null);
+      return;
+    }
+
+    const exportFormat = format || props.options?.maskExportFormat || 'png';
+    const fgColor = foregroundColor || props.options?.maskExportForeground || 'black';
+
+    const maskData = canvasBrush.getImageData();
+    if (!maskData) {
+      resolve(null);
+      return;
+    }
+
+    const htmlImg = document.createElement('img');
+    htmlImg.onload = () => {
+      const canvas = document.createElement('canvas');
+      canvas.width = imageWidth.value || 0;
+      canvas.height = imageHeight.value || 0;
+      const ctx = canvas.getContext('2d');
+      if (!ctx) {
+        resolve(null);
+        return;
+      }
+
+      ctx.drawImage(htmlImg, 0, 0);
+
+      const isWhite = fgColor === 'white';
+      const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+      const data = imageData.data;
+
+      for (let i = 0; i < data.length; i += 4) {
+        if (data[i + 3] > 0) {
+          data[i] = isWhite ? 255 : 0;
+          data[i + 1] = isWhite ? 255 : 0;
+          data[i + 2] = isWhite ? 255 : 0;
+          data[i + 3] = 255;
+        } else if (exportFormat !== 'png') {
+          data[i] = isWhite ? 0 : 255;
+          data[i + 1] = isWhite ? 0 : 255;
+          data[i + 2] = isWhite ? 0 : 255;
+          data[i + 3] = 255;
+        }
+      }
+      ctx.putImageData(imageData, 0, 0);
+
+      if (exportFormat === 'png') {
+        resolve(canvas.toDataURL('image/png'));
+      } else {
+        resolve(canvas.toDataURL('image/jpeg', 0.95));
+      }
+    };
+
+    htmlImg.onerror = () => {
+      resolve(null);
+    };
+
+    htmlImg.src = maskData;
+  });
+};
+
+const exportCOCO = (): string => {
+  const coco = exportCOCOFormat(
+    pointAnnotations.value,
+    props.imageSource.url || '',
+    imageWidth.value || 0,
+    imageHeight.value || 0
+  );
+  return JSON.stringify(coco, null, 2);
+};
+
+const exportYOLO = (): { annotations: string; classNames: string } => {
+  const yolo = exportYOLOFormat(
+    pointAnnotations.value,
+    imageWidth.value || 0,
+    imageHeight.value || 0
+  );
+  return {
+    annotations: yolo.annotations,
+    classNames: yolo.classNames,
+  };
 };
 
 const importCanvasJSON = async (
   jsonString: string,
   options?: { resetZoom?: boolean },
 ): Promise<boolean> => {
-  return false;
+  try {
+    const data = JSON.parse(jsonString);
+
+    // 如果指定了重置缩放
+    if (options?.resetZoom) {
+      resetZoom();
+      fitImageToCanvas();
+    }
+
+    // 清除现有标注
+    pointAnnotations.value.forEach((p: any) => {
+      const element = pointLayer.findOne(`#${p.id}`);
+      if (element) {
+        pointLayer.remove(element);
+        element.destroy();
+      }
+    });
+    pointAnnotations.value = [];
+
+    // 清除笔刷
+    canvasBrush?.clear();
+
+    // 如果有图片URL且与当前不同，加载图片
+    if (data.imageUrl && data.imageUrl !== props.imageSource.url) {
+      await loadImage(data.imageUrl);
+    }
+
+    // 恢复点标注
+    if (data.pointAnnotations && Array.isArray(data.pointAnnotations)) {
+      for (const pointData of data.pointAnnotations) {
+        const pointElement = new PointAnnotationElement(pointData, pointStyle.value);
+        if (currentTool.value === 'brush' || currentTool.value === 'eraser') {
+          pointElement.label.editable = false;
+        }
+        pointLayer.add(pointElement);
+        pointAnnotations.value.push(pointData);
+      }
+    }
+
+    // 恢复笔刷遮罩
+    if (data.brushMask && canvasBrush) {
+      canvasBrush.restoreImageData(data.brushMask);
+    }
+
+    // 强制【标注点】不跟随画布Scale变化
+    changePointScaleRelativeCanvas(pointLayer);
+
+    return true;
+  } catch (error) {
+    console.error('Failed to import canvas JSON:', error);
+    return false;
+  }
 };
 
 onMounted(() => {
@@ -1104,9 +1238,14 @@ defineExpose({
   getImageInfo,
   exportCanvasJSON,
   exportMaskImage,
+  exportCOCO,
+  exportYOLO,
   importCanvasJSON,
   loadImage,
   clearBrush,
+  zoomIn,
+  zoomOut,
+  resetZoom,
 });
 
 declare global {

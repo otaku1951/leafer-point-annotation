@@ -47,8 +47,30 @@
       
       <div class="control-group">
         <h3>Brush Mask Export</h3>
+        <div class="mask-options">
+          <label>
+            Format:
+            <select v-model="maskFormat">
+              <option value="png">PNG</option>
+              <option value="jpeg">JPEG</option>
+            </select>
+          </label>
+          <label>
+            Foreground:
+            <select v-model="maskForeground">
+              <option value="black">Black</option>
+              <option value="white">White</option>
+            </select>
+          </label>
+        </div>
         <button @click="exportMaskImage">Export Mask Image</button>
         <button @click="clearBrush">Clear Brush</button>
+      </div>
+
+      <div class="control-group">
+        <h3>Annotation Format Export</h3>
+        <button @click="exportCOCO">Export COCO JSON</button>
+        <button @click="exportYOLO">Export YOLO</button>
       </div>
     </div>
     
@@ -97,6 +119,8 @@ const editorOptions = ref({
 const loadStatus = ref('idle')
 const pointData = ref('')
 const pointAnnotation = ref<InstanceType<typeof PointAnnotation> | null>(null)
+const maskFormat = ref<'png' | 'jpeg'>('png')
+const maskForeground = ref<'black' | 'white'>('black')
 
 // 处理点变化
 const handlePointChange = (data: any) => {
@@ -196,30 +220,54 @@ const importCanvasJSON = async (event: Event) => {
 }
 
 // 导出Mask图片
-const exportMaskImage = () => {
+const exportMaskImage = async () => {
   if (pointAnnotation.value) {
-    const maskData = pointAnnotation.value.exportMaskImage()
+    const maskData = await pointAnnotation.value.exportMaskImage(maskFormat.value, maskForeground.value)
     if (maskData) {
-      // 创建图片并下载
-      const img = new Image()
-      img.onload = () => {
-        const canvas = document.createElement('canvas')
-        canvas.width = img.width
-        canvas.height = img.height
-        const ctx = canvas.getContext('2d')
-        if (ctx) {
-          ctx.drawImage(img, 0, 0)
-          const url = canvas.toDataURL('image/png')
-          const a = document.createElement('a')
-          a.href = url
-          a.download = 'brush-mask.png'
-          a.click()
-        }
-      }
-      img.src = maskData
+      const ext = maskFormat.value === 'png' ? 'png' : 'jpg'
+      const a = document.createElement('a')
+      a.href = maskData
+      a.download = `brush-mask.${ext}`
+      a.click()
     } else {
       alert('No brush data to export.')
     }
+  }
+}
+
+// 导出COCO格式
+const exportCOCO = () => {
+  if (pointAnnotation.value) {
+    const coco = pointAnnotation.value.exportCOCO()
+    const blob = new Blob([coco], { type: 'application/json' })
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = 'annotation-coco.json'
+    a.click()
+    URL.revokeObjectURL(url)
+  }
+}
+
+// 导出YOLO格式
+const exportYOLO = () => {
+  if (pointAnnotation.value) {
+    const yolo = pointAnnotation.value.exportYOLO()
+    const blob = new Blob([yolo.annotations], { type: 'text/plain' })
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = 'annotation-yolo.txt'
+    a.click()
+    URL.revokeObjectURL(url)
+
+    const classBlob = new Blob([yolo.classNames], { type: 'text/plain' })
+    const classUrl = URL.createObjectURL(classBlob)
+    const classA = document.createElement('a')
+    classA.href = classUrl
+    classA.download = 'class-names.txt'
+    classA.click()
+    URL.revokeObjectURL(classUrl)
   }
 }
 
@@ -278,6 +326,25 @@ input {
   border: 1px solid #ddd;
   border-radius: 4px;
   margin-bottom: 10px;
+}
+
+.mask-options {
+  display: flex;
+  gap: 15px;
+  margin-bottom: 10px;
+}
+
+.mask-options label {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  font-weight: normal;
+}
+
+.mask-options select {
+  padding: 4px 8px;
+  border: 1px solid #ddd;
+  border-radius: 4px;
 }
 
 button {

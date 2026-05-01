@@ -26,6 +26,7 @@ export class AddPointCommand implements ICommand {
 
   execute(): void {
     this.container.add(this.element);
+    this.dataArray.push(this.pointData);
   }
 
   undo(): void {
