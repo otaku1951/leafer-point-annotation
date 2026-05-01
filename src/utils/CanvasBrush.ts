@@ -166,4 +166,14 @@ export class CanvasBrush {
     };
     img.src = dataUrl;
   }
+
+  public hasContent(): boolean {
+    if (this.width === 0 || this.height === 0) return false;
+    const imageData = this.canvas.context.getImageData(0, 0, this.width, this.height);
+    const data = imageData.data;
+    for (let i = 3; i < data.length; i += 4) {
+      if (data[i] > 0) return true;
+    }
+    return false;
+  }
 }

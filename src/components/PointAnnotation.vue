@@ -1149,6 +1149,17 @@ const deleteSelected = () => {
     return;
   }
 
+  // select 模式下未选中任何元素，清除所有
+  if (currentTool.value === 'select') {
+    const selected = app?.editor?.list || [];
+    if (selected.length === 0 && (pointAnnotations.value.length > 0 || canvasBrush?.hasContent())) {
+      if (confirm('确定清除所有标注和笔刷绘制区域吗？')) {
+        clearAllAnnotationsAndBrush();
+      }
+      return;
+    }
+  }
+
   if (!app?.editor) return;
 
   const selected = app.editor.list;
@@ -1177,6 +1188,24 @@ const deleteSelected = () => {
 
   // 触发事件
   emit("pointChange", [...pointAnnotations.value]);
+};
+
+// 清除所有标注和笔刷
+const clearAllAnnotationsAndBrush = () => {
+  // 清除所有点标注
+  pointAnnotations.value.forEach((p: any) => {
+    const element = pointLayer.children.find((el: any) => el.data?.id === p.id);
+    if (element) {
+      pointLayer.remove(element);
+      element.destroy();
+    }
+  });
+  pointAnnotations.value = [];
+
+  // 清除笔刷
+  canvasBrush?.clear();
+
+  emit("pointChange", []);
 };
 
 // 清除所有笔刷内容
