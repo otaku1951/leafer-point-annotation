@@ -405,7 +405,7 @@ const initCanvas = () => {
   app?.tree.add(pointLayer);
 
   // 设置图层的 zIndex
-  pointLayer.zIndex = 10;
+  pointLayer.zIndex = 10000;
 
   if (app) {
     app.on(ZoomEvent.ZOOM, () => {
@@ -532,6 +532,7 @@ onMounted(() => {
 
     window.addEventListener("keydown", handleKeyDown);
     window.addEventListener("mousemove", handleMouseMove);
+    window.addEventListener("focusout", handleFocusOut);
 
     const unsubscribe = tinykeys(window, {
       v: (event: KeyboardEvent) => {
@@ -650,6 +651,28 @@ const handleKeyDown = (e: KeyboardEvent) => {
     }
   }
 };
+const handleFocusOut = (e: FocusEvent) => {
+  const target = e.target;
+  if (target instanceof HTMLElement && target.classList[0] === 'leafer-text-editor') {
+      // 关键：手动触发 DOM 原生的 blur
+      // 这会强制让浏览器完成失焦流程，触发插件的销毁逻辑
+      app?.editor.cancel()
+      // console.log('已强制执行 blur');
+  }
+};
+
+const updateLabelEditable = (editable: boolean) => {
+  // 遍历所有点标注元素，更新标签的可编辑状态
+  if (pointLayer && pointLayer.children) {
+    pointLayer.children.forEach((element: any) => {
+      if (element._element_tag === 'point-annotation' && element.label) {
+        element.label.editable = editable;
+        // if(!editable) app?.editor.cancel()
+      }
+    });
+  }
+};
+
 
 onUnmounted(() => {
   if (imageBox) {
@@ -661,6 +684,7 @@ onUnmounted(() => {
 
   window.removeEventListener("keydown", handleKeyDown);
   window.removeEventListener("mousemove", handleMouseMove);
+  window.removeEventListener('focusout', handleFocusOut);
 
   if (window.__pointAnnotationHotkeysUnsubscribe) {
     window.__pointAnnotationHotkeysUnsubscribe();
@@ -679,6 +703,8 @@ const selectTool = () => {
   app.editor.config.multipleSelect = true // 启用多选
   // 禁用笔刷 Canvas 的点击事件，让点击穿透到图片
   canvasBrush?.setPointerEvents(false);
+  // 启用标签编辑
+  updateLabelEditable(true);
 };
 
 const pointTool = () => {
@@ -690,6 +716,8 @@ const pointTool = () => {
   app.editor.config.multipleSelect = false // 禁用多选
   // 禁用笔刷 Canvas 的点击事件，让点击穿透到图片
   canvasBrush?.setPointerEvents(false);
+  // 启用标签编辑
+  updateLabelEditable(true);
 };
 
 const brushTool = () => {
@@ -701,6 +729,8 @@ const brushTool = () => {
   app.editor.config.multipleSelect = false;
   // 启用笔刷 Canvas 的点击事件
   canvasBrush?.setPointerEvents(true);
+  // 禁用标签编辑
+  updateLabelEditable(false);
   // 显示配置面板
   showBrushPanel.value = !showBrushPanel.value;
   if (showBrushPanel.value) {
@@ -734,6 +764,8 @@ const eraserTool = () => {
   app.editor.config.multipleSelect = false;
   // 启用笔刷 Canvas 的点击事件
   canvasBrush?.setPointerEvents(true);
+  // 禁用标签编辑
+  updateLabelEditable(false);
 };
 
 // 初始化笔刷图层（在图片加载后调用）
@@ -833,8 +865,15 @@ const generateUUID = (): string => {
 const handleCanvasTap = (e: any) => {
   if (currentTool.value !== 'point' || !app || !imageBox) return;
 
-  // 检查是否点击在点标注元素上（避免重复点击）
-  if (e.target && e.target._element_tag === 'point-annotation') return;
+  // 如果编辑器正处于编辑状态（有点标注被选中），不创建新标注
+  if (app.editor && app.editor.list && app.editor.list.length > 0) return;
+
+  // 检查是否点击在点标注元素上（遍历父级链）
+  let target: any = e.target;
+  while (target) {
+    if (target._element_tag === 'point-annotation') return;
+    target = target.parent;
+  }
 
   // 获取相对于 contentLayer 的坐标
   const point = contentLayer.getBoxPoint({ x: e.x, y: e.y });
@@ -851,6 +890,7 @@ const handleCanvasTap = (e: any) => {
 
 // 处理点击【标注点】选中样式
 const handlePointAnnotationSelected = (e: any) => {
+  if (currentTool.value === 'brush' || currentTool.value === 'eraser' || !app || !imageBox) return;
   // console.log(e)
   if (e.value) {
     if (Array.isArray(e.value)) {
@@ -912,6 +952,11 @@ const createPointAnnotation = (pixelX: number, pixelY: number) => {
 
   // 创建点标注元素
   const pointElement = new PointAnnotationElement(pointData, pointStyle.value);
+
+  // 根据当前工具设置标签的可编辑状态
+  if (currentTool.value === 'brush' || currentTool.value === 'eraser') {
+    pointElement.label.editable = false;
+  }
 
   // 添加到图层
   pointLayer.add(pointElement);

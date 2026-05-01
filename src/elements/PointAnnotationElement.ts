@@ -3,7 +3,6 @@ import type { PointAnnotation, PointStyle } from '@/types';
 import { DEFAULT_POINT_STYLE } from '@/types';
 import "@leafer-in/state"
 import "@leafer-in/text-editor"
-// import { EditorEvent, InnerEditorEvent } from '@leafer-in/editor';
 
 export class PointAnnotationElement extends Group {
   public circle: Ellipse;
