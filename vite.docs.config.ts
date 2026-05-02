@@ -1,8 +1,28 @@
 import { defineConfig } from 'vite'
 import vue from '@vitejs/plugin-vue'
+import { resolve } from 'path'
 
-// https://vite.dev/config/
 export default defineConfig({
   plugins: [vue()],
-  base: './'
+  base: './',
+  resolve: {
+    alias: {
+      '@': resolve(__dirname, './src')
+    }
+  },
+  build: {
+    outDir: 'docs',
+    assetsDir: 'assets',
+    minify: 'terser',
+    terserOptions: {
+      compress: {
+        drop_console: true,
+        drop_debugger: true
+      }
+    }
+  },
+  server: {
+    port: 3000,
+    open: true
+  }
 })

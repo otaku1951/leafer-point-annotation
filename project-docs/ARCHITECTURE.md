@@ -18,8 +18,8 @@
 ┌─────────────────────────────────────────────────────────────┐
 │                        UI 层                               │
 │  ┌──────────────┐  ┌──────────────┐  ┌──────────────────┐ │
-│  │ Toolbar.vue  │  │ BrushSize    │  │ PointAnnotation  │ │
-│  │ (工具栏)     │  │ Slider.vue   │  │ (主画布组件)     │ │
+│  │  BrushSize   │  │BrushStyle    │  │ PointAnnotation  │ │
+│  │ Slider.vue   │  │  Panel.vue   │  │ (主画布组件)     │ │
 │  └──────┬───────┘  └──────┬───────┘  └────────┬─────────┘ │
 │         │                 │                    │          │
 └─────────┼─────────────────┼────────────────────┼──────────┘
@@ -39,8 +39,11 @@
           ▼                 ▼                 ▼
 ┌─────────────────┐ ┌─────────────────┐ ┌─────────────────┐
 │   元素封装层    │ │   工具类层      │ │   类型定义层    │
-│ PointAnnotation │ │  BrushStroke    │ │   types/index   │
-│ Element.ts      │ │  .ts            │ │   .ts           │
+│ PointAnnotation │ │CanvasBrush.ts   │ │   types/index   │
+│ Element.ts      │ │PointCommands.ts │ │   .ts           │
+│                 │ │BrushCommands.ts │ │                 │
+│                 │ │COCOExporter.ts  │ │                 │
+│                 │ │YOLOExporter.ts  │ │                 │
 └─────────────────┘ └─────────────────┘ └─────────────────┘
 ```
 
@@ -52,9 +55,10 @@
 
 | 模块 | 文件路径 | 职责 |
 |------|----------|------|
-| Toolbar | 集成在 PointAnnotation.vue 中 | 工具栏按钮、工具切换、热键提示 |
 | BrushSizeSlider | src/components/BrushSizeSlider.vue | 笔刷大小调节浮动组件 |
+| BrushStylePanel | src/components/BrushStylePanel.vue | 笔刷样式配置面板（颜色、透明度、大小等） |
 | Canvas | 集成在 PointAnnotation.vue 中 | LeaferJS 画布渲染、事件监听 |
+| App.vue (测试入口) | src/App.vue | 提供完整的测试界面和示例 |
 
 ### 2.2 业务逻辑层
 
@@ -65,25 +69,29 @@
 | 命令管理 | PointAnnotation.vue | 集成 CommandManager、管理撤销/重做 |
 | 数据管理 | PointAnnotation.vue | 管理点标注和笔刷数据的增删改查 |
 | 导出导入 | PointAnnotation.vue | 处理数据导出和导入逻辑 |
+| 标签编辑 | PointAnnotation.vue | 管理标签编辑状态，根据工具控制可编辑性 |
 
 ### 2.3 元素封装层
 
 | 模块 | 文件路径 | 职责 |
 |------|----------|------|
-| PointAnnotationElement | src/elements/PointAnnotationElement.ts | 封装点标注元素（Group + Ellipse + Text） |
+| PointAnnotationElement | src/elements/PointAnnotationElement.ts | 封装点标注元素（Group + Ellipse + Text），支持 hover/selected 状态 |
 
 ### 2.4 工具类层
 
 | 模块 | 文件路径 | 职责 |
 |------|----------|------|
-| BrushStroke | src/utils/BrushStroke.ts | 封装笔刷绘制逻辑 |
-| UUID | 内置或第三方库 | 生成唯一 ID |
+| CanvasBrush | src/utils/CanvasBrush.ts | 使用 LeaferJS Canvas 实现笔刷绘制，支持 draw/erase/clear/hasContent |
+| PointCommands | src/utils/PointCommands.ts | 点标注的 Add/Remove 命令实现 |
+| BrushCommands | src/utils/BrushCommands.ts | 笔刷的快照命令实现（BrushSnapshotCommand） |
+| COCOExporter | src/utils/COCOExporter.ts | COCO 格式数据导出 |
+| YOLOExporter | src/utils/YOLOExporter.ts | YOLO 格式数据导出 |
 
 ### 2.5 类型定义层
 
 | 模块 | 文件路径 | 职责 |
 |------|----------|------|
-| Types | src/types/index.ts | 定义所有 TypeScript 类型接口 |
+| Types | src/types/index.ts | 定义所有 TypeScript 类型接口（PointAnnotation、BrushStyle、ExportOptions 等） |
 
 ---
 
@@ -92,11 +100,12 @@
 ### 3.1 PointAnnotation.vue（主组件）
 
 **核心职责**：
-- 初始化 LeaferJS 应用
+- 初始化 LeaferJS 应用和图片加载
 - 管理工具状态和切换逻辑
 - 处理用户交互事件
 - 管理撤销/重做队列
 - 提供对外 API
+- 处理数据导出/导入
 
 **状态管理**：
 ```typescript
@@ -105,14 +114,19 @@ const currentTool = ref<ToolType>('select');
 
 // 数据状态
 const pointAnnotations = ref<PointAnnotation[]>([]);
-const brushStrokes = ref<BrushStrokeData[]>([]);
+const pointCounter = ref(1);
 
 // 画布状态
-const zoomLevel = ref(100);
-const isCanvasFocused = ref(false);
+const loadStatus = ref('idle');
+const imageWidth = ref<number | null>(null);
+const imageHeight = ref<number | null>(null);
 
 // UI 状态
-const showBrushSizeSlider = ref(false);
+const showBrushPanel = ref(false);
+const brushButtonRect = ref({ x: 0, y: 0, width: 0, height: 0 });
+
+// 笔刷样式
+const localBrushStyle = ref<BrushStyle>({ ...DEFAULT_BRUSH_STYLE });
 ```
 
 **事件处理**：
@@ -121,47 +135,94 @@ const showBrushSizeSlider = ref(false);
 | pointerdown | handlePointerDown | 创建点标注/开始笔刷绘制 |
 | pointermove | handlePointerMove | 笔刷绘制/鼠标追踪 |
 | pointerup | handlePointerUp | 完成笔刷绘制 |
-| keydown | handleKeyDown | 热键处理 |
+| keydown | handleKeyDown | 热键处理（tinykeys） |
+
+**对外 API**：
+```typescript
+defineExpose({
+  getPointAnnotations,
+  getImageInfo,
+  exportCanvasJSON,
+  exportMaskImage,
+  exportCOCO,
+  exportYOLO,
+  importCanvasJSON,
+  loadImage,
+  clearBrush,
+  zoomIn,
+  zoomOut,
+  resetZoom,
+  undo,
+  redo,
+  getCurrentTool,
+  setTool,
+  createPointAnnotation,
+  removePointAnnotation,
+});
+```
 
 ### 3.2 PointAnnotationElement（点标注元素）
 
 **结构设计**：
 ```
-Group (容器)
+Group (容器) - id: 点数据的 id, _element_tag: 'point-annotation'
 ├── Ellipse (圆点) - 负责视觉样式、hover/selected 效果
-└── Text (标签) - 负责显示标签文本、支持编辑
+└── Text (标签) - 负责显示标签文本、支持编辑，带 boxStyle 背景
 ```
 
 **核心方法**：
 | 方法 | 功能 |
 |------|------|
-| constructor | 初始化元素、绑定事件 |
-| updateHover | 更新 hover 状态样式 |
-| updateSelected | 更新 selected 状态样式 |
+| constructor | 初始化元素、绑定事件、配置 hoverStyle |
+| handlePointAnnotationSelected | 更新选中状态样式（fill/stroke/scale） |
+| handleLabelChange | 处理标签编辑变更（非空校验） |
 | updatePosition | 更新位置坐标 |
 | updateLabel | 更新标签文本 |
+| getLabel / getLastValidLabel | 获取标签值 |
 
-### 3.3 BrushStroke（笔刷绘制）
+### 3.3 CanvasBrush（笔刷绘制）
 
 **核心职责**：
-- 管理笔刷路径数据
-- 实时更新 Canvas 渲染
+- 使用 LeaferJS Canvas 实现笔刷绘制
+- 外层 Group 控制整体透明度（避免多次叠加）
 - 支持绘制和擦除模式
+- 连续性阈值处理（两个点之间距离过远时自动连线）
+- 图片数据导出/恢复
+- hasContent() 检测是否有内容
 
 **核心方法**：
 | 方法 | 功能 |
 |------|------|
-| constructor | 初始化路径、设置样式 |
-| addPoint | 添加路径点、更新路径 |
-| finish | 完成绘制、返回路径数据 |
-| remove | 移除路径 |
+| constructor | 初始化 Canvas 和外层 Group |
+| draw | 绘制笔刷（使用多个圆填充路径） |
+| erase | 擦除操作（destination-out） |
+| clear | 清除所有内容 |
+| getImageData | 导出为 PNG dataURL |
+| restoreImageData | 从 dataURL 恢复画布 |
+| hasContent | 检测是否有非透明像素 |
+| setPointerEvents | 控制 Canvas 是否拦截事件 |
 
-### 3.4 BrushSizeSlider（笔刷大小调节）
+### 3.4 笔刷命令设计
 
-**交互设计**：
-- 浮动显示在笔刷按钮上方
-- 包含范围滑块和实时预览
-- 点击空白处或按 ESC 键关闭
+**BrushSnapshotCommand**：
+- 笔刷操作使用快照方式实现撤销/重做
+- 保存操作前后的完整图片状态
+- undo/redo 时恢复对应状态
+
+### 3.5 导出导入实现
+
+**导出格式**：
+1. **JSON Full**：完整数据（点标注 + 笔刷 mask）
+2. **JSON Points**：仅点标注数据
+3. **COCO**：COCO 数据集格式
+4. **YOLO**：YOLO 数据集格式
+5. **Mask**：二值图（PNG/JPEG 可选）
+
+**二值图特性**：
+- 前景色可配置（黑/白）
+- PNG 支持透明背景
+- JPG 自动处理背景色（前景黑则背景白，反之亦然）
+- 使用 getImageData() 扫描像素，重新绘制为纯二值图
 
 ---
 
@@ -171,23 +232,23 @@ Group (容器)
 
 ```
 用户点击 → handlePointerDown → createPointAnnotation → 
-  PointAnnotationElement → addPointCommand → CommandManager → 
+  PointAnnotationElement → AddPointCommand → CommandManager → 
   pointAnnotations (响应式数组) → 导出数据
 ```
 
 ### 4.2 笔刷数据流转
 
 ```
-用户绘制 → handlePointerMove → BrushStroke.addPoint → 
-  BrushStrokeCommand → CommandManager → 
-  brushStrokes (响应式数组) → 导出二值图
+用户绘制 → handlePointerMove → CanvasBrush.draw → 
+  (操作结束) → BrushSnapshotCommand → CommandManager → 
+  (内部保存 mask 图片)
 ```
 
 ### 4.3 导出/导入数据流转
 
 ```
-导出：用户触发 → exportData(format) → 格式化数据 → 返回数据字符串/Blob
-导入：用户触发 → importData(data) → 解析数据 → 重建元素 → 更新状态
+导出：用户触发 → exportData(format) → Exporter 格式化 → 返回数据字符串/Blob
+导入：用户触发 → importCanvasJSON(json) → 解析数据 → 重建元素 → fitImageToCanvas
 ```
 
 ---
@@ -198,21 +259,18 @@ Group (容器)
 
 | 命令类 | 功能 | 撤销逻辑 |
 |--------|------|----------|
-| AddPointCommand | 添加点标注 | 移除点标注 |
-| RemovePointCommand | 删除点标注 | 重新添加点标注 |
-| MovePointCommand | 移动点标注 | 恢复原位置 |
-| BrushStrokeCommand | 笔刷绘制 | 移除绘制路径 |
-| EraseCommand | 擦除操作 | 恢复擦除前状态 |
-| ClearBrushCommand | 清除所有涂抹 | 恢复所有路径 |
+| AddPointCommand | 添加点标注 | 移除点标注、从数组删除 |
+| RemovePointCommand | 删除点标注 | 重新添加点标注、插入原位置 |
+| BrushSnapshotCommand | 笔刷快照 | 恢复操作前的图片状态 |
 
 ### 5.2 命令管理器集成
 
 ```typescript
-// 初始化命令管理器
+// 初始化命令管理器（历史限制 100）
 const commandManager = new CommandManager(100);
 
 // 执行命令
-commandManager.executeCommand(new AddPointCommand(app, pointElement));
+commandManager.executeCommand(new AddPointCommand(pointLayer, element, pointAnnotations.value, data));
 
 // 撤销/重做
 commandManager.undo();
@@ -232,19 +290,27 @@ commandManager.redo();
 | brush | 禁用 | 避免干扰笔刷绘制 |
 | eraser | 禁用 | 避免干扰擦除操作 |
 
-### 6.2 实现逻辑
+### 6.2 标签编辑控制
+
+| 工具 | 标签可编辑 | 说明 |
+|------|-----------|------|
+| select | true | 可以编辑标签 |
+| point | true | 可以编辑标签 |
+| brush | false | 禁用编辑，避免冲突 |
+| eraser | false | 禁用编辑，避免冲突 |
+
+### 6.3 实现逻辑
 
 ```typescript
-const setTool = (tool: ToolType) => {
-  currentTool.value = tool;
-  
-  if (tool === 'point' || tool === 'select') {
-    app.editor = true;
-    app.editor.select = true;
-    app.editor.drag = true;
-  } else {
-    app.editor = false;
-  }
+const switchToSelect = () => {
+  currentTool.value = 'select';
+  showBrushPanel.value = false;
+  if (!app) return;
+  app.editor.config.moveable = false;
+  app.editor.config.resizeable = false;
+  app.editor.config.multipleSelect = true;
+  canvasBrush?.setPointerEvents(false);
+  updateLabelEditable(true);
 };
 ```
 
@@ -257,37 +323,40 @@ const setTool = (tool: ToolType) => {
 | 方法名 | 参数 | 返回值 | 功能描述 |
 |--------|------|--------|----------|
 | getPointAnnotations | 无 | PointAnnotation[] | 获取所有点标注数据 |
-| addPointAnnotation | (data: PointAnnotation) | void | 添加点标注 |
-| updatePointAnnotation | (id: string, data: Partial\<PointAnnotation\>) | boolean | 更新点标注 |
-| deletePointAnnotation | (id: string) | boolean | 删除点标注 |
-| clearPointAnnotations | 无 | void | 清除所有点标注 |
-| getBrushData | 无 | BrushStrokeData[] | 获取笔刷数据 |
-| clearBrush | 无 | void | 清除笔刷涂抹 |
-| exportBrushMask | 无 | Blob | 导出二值图 |
+| createPointAnnotation | (x, y) | string \| null | 创建标注点，返回 id |
+| removePointAnnotation | (id) | boolean | 删除指定 id 的点标注 |
+| clearBrush | 无 | void | 清除所有笔刷内容 |
+| exportCanvasJSON | 无 | string | 导出完整 JSON 数据 |
+| exportMaskImage | (format, fgColor) | string \| null | 导出二值图 dataURL |
+| exportCOCO | 无 | COCOExport | 导出 COCO 格式数据 |
+| exportYOLO | 无 | YOLOExport | 导出 YOLO 格式数据 |
+| importCanvasJSON | (json) | void | 导入 JSON 数据 |
+| loadImage | (url) | Promise | 加载图片 |
 | undo | 无 | void | 撤销操作 |
 | redo | 无 | void | 重做操作 |
-| canUndo | 无 | boolean | 是否可撤销 |
-| canRedo | 无 | boolean | 是否可重做 |
-| setTool | (tool: ToolType) | void | 设置当前工具 |
+| setTool | (tool) | void | 设置当前工具 |
 | getCurrentTool | 无 | ToolType | 获取当前工具 |
 | zoomIn | 无 | void | 放大画布 |
 | zoomOut | 无 | void | 缩小画布 |
 | resetZoom | 无 | void | 重置缩放 |
-| getZoomLevel | 无 | number | 获取缩放级别 |
-| exportCanvasJSON | (format: ExportFormat) | string | 导出画布数据 |
-| importCanvasJSON | (data: string, options?) | boolean | 导入画布数据 |
-| getStatistics | 无 | Statistics | 获取统计信息 |
 
-### 7.2 统计信息结构
+### 7.2 Props 配置
 
-```typescript
-interface Statistics {
-  pointCount: number;            // 点标注数量
-  brushStrokeCount: number;      // 笔刷笔画数量
-  brushAreaPercent: number;      // 涂抹面积百分比
-  hasChanges: boolean;           // 是否有未保存修改
-}
-```
+| 属性名 | 类型 | 默认值 | 说明 |
+|--------|------|--------|------|
+| imageSource | { id, url } | - | 图片源配置 |
+| pointStyle | Partial\<PointStyle\> | DEFAULT_POINT_STYLE | 点标注样式 |
+| brushStyle | Partial\<BrushStyle\> | DEFAULT_BRUSH_STYLE | 笔刷样式 |
+| options | { maskExportFormat, maskExportForeground } | - | 导出配置 |
+
+### 7.3 Events
+
+| 事件名 | 参数 | 说明 |
+|--------|------|------|
+| pointChange | PointAnnotation[] | 点标注数据变化 |
+| loadStart | - | 图片开始加载 |
+| loadSuccess | - | 图片加载成功 |
+| loadError | - | 图片加载失败 |
 
 ---
 
@@ -297,27 +366,36 @@ interface Statistics {
 
 | 策略 | 说明 |
 |------|------|
-| 批量更新 | 使用 `set()` 批量更新属性，减少重绘次数 |
-| 图层分离 | 点标注和笔刷使用不同图层，避免相互影响 |
-| 路径缓存 | 缓存笔刷路径数据，避免重复计算 |
+| **Group 透明度控制** | 透明度设置在 Group 上，避免 Canvas 上多次叠加 |
+| **批量更新** | 使用 `set()` 批量更新属性，减少重绘次数 |
+| **图层分离** | 图片层、点标注层、笔刷层分离，独立控制 |
+| **路径填充** | 笔刷使用多个圆填充，避免复杂路径计算 |
 
 ### 8.2 事件处理优化
 
 | 策略 | 说明 |
 |------|------|
-| 事件委托 | 使用事件委托减少监听器数量 |
-| 节流处理 | 对频繁触发的事件进行节流 |
-| 条件监听 | 只在需要时监听特定事件 |
+| **事件委托** | LeaferJS 自动处理事件冒泡 |
+| **条件监听** | 笔刷 Canvas 只在需要时拦截事件（pointerEvents） |
+| **updateLabelEditable** | 只在工具切换时更新标签可编辑性 |
 
 ### 8.3 内存管理
 
 | 策略 | 说明 |
 |------|------|
-| 及时清理 | 移除不再使用的元素和事件监听器 |
-| 历史限制 | 设置合理的撤销历史记录限制（默认 100） |
+| **及时清理** | 移除元素时调用 destroy() |
+| **历史限制** | 设置合理的撤销历史记录限制（默认 100） |
+| **Canvas 重用** | CanvasBrush 复用同一 Canvas 对象 |
+
+### 8.4 导出优化
+
+| 策略 | 说明 |
+|------|------|
+| **异步处理** | 图片导出使用 async/await，避免阻塞 |
+| **DataURL 缓存** | 笔刷快照保存 dataURL，避免重复序列化 |
 
 ---
 
-**文档版本**：1.0  
+**文档版本**：2.0  
 **创建日期**：2026-04-28  
-**最后更新**：2026-04-28
+**最后更新**：2026-05-02
