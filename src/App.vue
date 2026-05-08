@@ -116,11 +116,14 @@ import { ref, computed } from 'vue'
 import PointAnnotation from './components/PointAnnotation.vue'
 
 // 图片URL
-const imageUrl = ref('https://picsum.photos/1280/1080')
-const imageSource = computed(() => ({
-  id: 'test-image',
-  url: imageUrl.value
-}))
+const imageUrl = ref('')
+const imageSource = computed(() => {
+  if (!imageUrl.value) return undefined
+  return {
+    id: 'test-image',
+    url: imageUrl.value
+  }
+})
 
 // 编辑器选项
 const editorOptions = ref({

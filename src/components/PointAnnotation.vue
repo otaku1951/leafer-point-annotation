@@ -1,13 +1,21 @@
 <template>
   <div
     class="point-annotation"
+    :class="{ 'has-image': showTools }"
     @focus="isCanvasFocused = true"
     @blur="isCanvasFocused = false"
     @mouseenter="isMouseOverCanvas = true"
     @mouseleave="isMouseOverCanvas = false"
   >
     <!-- 画布容器 -->
-    <div ref="canvasContainer" class="canvas-container" tabindex="0">
+    <div
+      ref="canvasContainer"
+      class="canvas-container"
+      tabindex="0"
+      @dragover="handleDragOver"
+      @dragleave="handleDragLeave"
+      @drop="handleDrop"
+    >
       <!-- 加载占位 -->
       <div
         v-if="loadStatus === 'loading'"
@@ -17,14 +25,45 @@
         <div class="loading-text">图片加载中</div>
       </div>
 
+      <!-- 空状态/上传区域 -->
+      <div v-if="loadStatus === 'idle'" class="upload-overlay" :class="{ 'drag-over': isDragOver }">
+        <input
+          ref="fileInputRef"
+          type="file"
+          accept="image/*"
+          style="display: none"
+          @change="handleFileUpload"
+        />
+        <div class="upload-icon">
+          <svg
+            xmlns="http://www.w3.org/2000/svg"
+            width="48"
+            height="48"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="1.5"
+            stroke-linecap="round"
+            stroke-linejoin="round"
+          >
+            <rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect>
+            <circle cx="8.5" cy="8.5" r="1.5"></circle>
+            <polyline points="21 15 16 10 5 21"></polyline>
+          </svg>
+        </div>
+        <p class="upload-text">点击选择本地图片</p>
+        <p class="upload-hint">或拖拽图片到此处</p>
+        <button class="upload-button" @click="openFileDialog">选择图片</button>
+      </div>
+
       <!-- 错误状态 -->
       <div v-if="loadStatus === 'error'" class="error-overlay">
         <p>加载失败</p>
         <button @click="loadImage()">重试</button>
       </div>
 
-      <!-- 缩放控制器 -->
-      <div class="zoom-controller">
+      <!-- 缩放控制器 - 只在有图片时显示 -->
+      <div v-if="showTools" class="zoom-controller">
         <button class="zoom-button" title="缩小 (Ctrl+-)" @click="zoomOut">
           <svg
             xmlns="http://www.w3.org/2000/svg"
@@ -69,8 +108,8 @@
       </div>
     </div>
 
-    <!-- 工具栏 -->
-    <div class="toolbar">
+    <!-- 工具栏 - 只在有图片时显示 -->
+    <div v-if="showTools" class="toolbar">
       <button
         class="tool-button"
         :class="{ active: currentTool === 'select' }"
@@ -297,7 +336,8 @@ export interface OptionsSource {
 const props = defineProps({
   imageSource: {
     type: Object as () => ImageSource,
-    required: true,
+    required: false,
+    default: null,
   },
   options: {
     type: Object as () => OptionsSource,
@@ -315,9 +355,13 @@ const emit = defineEmits([
 ]);
 
 const canvasContainer = ref<HTMLElement | undefined>(undefined);
+const fileInputRef = ref<HTMLInputElement | null>(null);
 const loadStatus = ref<"idle" | "loading" | "success" | "error">("idle");
 const imageWidth = ref<number | null>(null);
 const imageHeight = ref<number | null>(null);
+const hasLocalImage = ref(false);
+const localImageUrl = ref<string>('');
+const isDragOver = ref(false);
 let app: App | null = null;
 let imageBox: Image | null = null;
 const contentLayer = new Group({ name: "contentLayer" });
@@ -338,6 +382,9 @@ const brushButtonRect = ref<DOMRect | null>(null);
 // 点标注数据
 const pointAnnotations = ref<PointAnnotation[]>([]);
 const pointCounter = ref(1);
+
+// 是否显示工具界面
+const showTools = computed(() => loadStatus.value === 'success');
 
 // 点标注样式配置
 const pointStyle = computed<PointStyle>(() => ({
@@ -370,6 +417,31 @@ watch(
       canvasBrush.setOpacity(newOpacity);
     }
   }
+);
+
+// 监听 props.imageSource 变化，重置本地图片状态
+watch(
+  () => props.imageSource?.url,
+  (newUrl, oldUrl) => {
+    if (newUrl) {
+      hasLocalImage.value = false;
+      localImageUrl.value = '';
+      loadImage(newUrl);
+    } else if (oldUrl && !newUrl) {
+      // 如果原来有图片，现在没有了，清空画布
+      hasLocalImage.value = false;
+      localImageUrl.value = '';
+      clearAllAnnotationsAndBrush();
+      // 移除图片
+      if (imageBox) {
+        contentLayer.clear();
+        imageBox.destroy();
+        imageBox = null;
+      }
+      loadStatus.value = 'idle';
+    }
+  },
+  { immediate: true }
 );
 
 // 笔刷相关状态
@@ -448,8 +520,14 @@ const preloadImageSize = (
 };
 
 const loadImage = async (imageSrc?: string | undefined) => {
-  const _imageSrc = imageSrc ? imageSrc : props.imageSource.url;
-  if (!app || !_imageSrc) return;
+  const _imageSrc = imageSrc 
+    ? imageSrc 
+    : (hasLocalImage.value ? localImageUrl.value : (props.imageSource?.url || ''));
+  
+  if (!app || !_imageSrc) {
+    loadStatus.value = "idle";
+    return;
+  }
 
   if (imageBox) {
     contentLayer.clear();
@@ -501,17 +579,70 @@ const loadImage = async (imageSrc?: string | undefined) => {
 
 const getImageInfo = () => {
   return {
-    id: props.imageSource.id,
-    url: props.imageSource.url,
+    id: hasLocalImage.value ? 'local-image' : (props.imageSource?.id || ''),
+    url: hasLocalImage.value ? localImageUrl.value : (props.imageSource?.url || ''),
     width: imageWidth.value,
     height: imageHeight.value,
   };
 };
 
+const handleFileUpload = (event: Event) => {
+  const target = event.target as HTMLInputElement;
+  const file = target.files?.[0];
+  if (file && file.type.startsWith('image/')) {
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      const result = e.target?.result as string;
+      localImageUrl.value = result;
+      hasLocalImage.value = true;
+      loadImage(result);
+    };
+    reader.readAsDataURL(file);
+  }
+  target.value = '';
+};
+
+const openFileDialog = () => {
+  fileInputRef.value?.click();
+};
+
+const handleDragOver = (event: DragEvent) => {
+  event.preventDefault();
+  event.stopPropagation();
+  isDragOver.value = true;
+};
+
+const handleDragLeave = (event: DragEvent) => {
+  event.preventDefault();
+  event.stopPropagation();
+  isDragOver.value = false;
+};
+
+const handleDrop = (event: DragEvent) => {
+  event.preventDefault();
+  event.stopPropagation();
+  isDragOver.value = false;
+  
+  const files = event.dataTransfer?.files;
+  if (files && files.length > 0) {
+    const file = files[0];
+    if (file.type.startsWith('image/')) {
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        const result = e.target?.result as string;
+        localImageUrl.value = result;
+        hasLocalImage.value = true;
+        loadImage(result);
+      };
+      reader.readAsDataURL(file);
+    }
+  }
+};
+
 const exportCanvasJSON = (): string => {
   const exportData = {
     version: '1.0',
-    imageUrl: props.imageSource.url || '',
+    imageUrl: hasLocalImage.value ? localImageUrl.value : (props.imageSource?.url || ''),
     imageWidth: imageWidth.value,
     imageHeight: imageHeight.value,
     pointAnnotations: [...pointAnnotations.value],
@@ -588,7 +719,7 @@ const exportMaskImage = (format?: 'png' | 'jpeg' | 'jpg', foregroundColor?: 'bla
 const exportCOCO = (): string => {
   const coco = exportCOCOFormat(
     pointAnnotations.value,
-    props.imageSource.url || '',
+    hasLocalImage.value ? localImageUrl.value : (props.imageSource?.url || ''),
     imageWidth.value || 0,
     imageHeight.value || 0
   );
@@ -1329,10 +1460,12 @@ declare global {
   --leafer-point-color-text: #333;
   --leafer-point-color-text-secondary: #666;
   --leafer-point-color-text-tertiary: #999999;
+  --leafer-point-color-placeholder: #999999;
   --leafer-point-color-border: #ddd;
   --leafer-point-color-border-light: #e0e0e0;
   --leafer-point-color-error: #e74c3c;
   --leafer-point-color-button: #3498db;
+  --leafer-point-color-button-rgb: 52, 152, 219;
   --leafer-point-color-button-hover: #2980b9;
 
   --leafer-point-padding-toolbar: 10px;
@@ -1368,10 +1501,14 @@ declare global {
 
 .canvas-container {
   width: 100%;
-  height: calc(100% - 55px);
+  height: 100%;
   position: relative;
   overflow: hidden;
   outline: none;
+}
+
+.point-annotation.has-image .canvas-container {
+  height: calc(100% - 55px);
 }
 
 .canvas-container:focus {
@@ -1425,46 +1562,108 @@ declare global {
   position: relative;
   z-index: 1;
   color: white;
-  font-size: 16px;
+  font-size: 18px;
   font-weight: 500;
   text-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
 }
 
-.error-overlay {
+.upload-overlay {
   position: absolute;
-  top: 50%;
-  left: 50%;
-  transform: translate(-50%, -50%);
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
   background-color: var(--leafer-point-color-white);
-  border-radius: var(--leafer-point-border-radius-overlay);
-  box-shadow: var(--leafer-point-shadow-overlay);
-  padding: var(--leafer-point-padding-error);
   display: flex;
   flex-direction: column;
   justify-content: center;
   align-items: center;
   z-index: 1000;
-  min-width: 200px;
+  border: 3px dashed var(--leafer-point-color-border);
+  transition: all 0.2s ease;
 }
 
-.error-overlay p {
-  margin-bottom: 20px;
-  color: var(--leafer-point-color-error);
-  font-size: 16px;
+.upload-icon {
+  color: var(--leafer-point-color-placeholder);
+  margin-bottom: 24px;
+  transform: scale(1.2);
 }
 
-.error-overlay button {
-  padding: var(--leafer-point-padding-error-button);
+.upload-text {
+  color: var(--leafer-point-color-text);
+  font-size: 18px;
+  font-weight: 500;
+  margin-bottom: 12px;
+}
+
+.upload-hint {
+  color: var(--leafer-point-color-placeholder);
+  font-size: 14px;
+  margin-bottom: 28px;
+}
+
+.upload-button {
+  padding: 12px 32px;
   background-color: var(--leafer-point-color-button);
   color: white;
   border: none;
   border-radius: var(--leafer-point-border-radius-tool-button);
   cursor: pointer;
-  font-size: 14px;
+  font-size: 15px;
+  font-weight: 500;
+  transition: all 0.2s ease;
+}
+
+.upload-button:hover {
+  background-color: var(--leafer-point-color-button-hover);
+  transform: translateY(-1px);
+}
+
+.upload-overlay.drag-over {
+  border-color: var(--leafer-point-color-button);
+  background-color: rgba(var(--leafer-point-color-button-rgb), 0.05);
+}
+
+.upload-overlay.drag-over .upload-icon {
+  color: var(--leafer-point-color-button);
+}
+
+.error-overlay {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background-color: var(--leafer-point-color-white);
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  z-index: 1000;
+}
+
+.error-overlay p {
+  margin-bottom: 24px;
+  color: var(--leafer-point-color-error);
+  font-size: 18px;
+  font-weight: 500;
+}
+
+.error-overlay button {
+  padding: 12px 32px;
+  background-color: var(--leafer-point-color-button);
+  color: white;
+  border: none;
+  border-radius: var(--leafer-point-border-radius-tool-button);
+  cursor: pointer;
+  font-size: 15px;
+  font-weight: 500;
+  transition: all 0.2s ease;
 }
 
 .error-overlay button:hover {
   background-color: var(--leafer-point-color-button-hover);
+  transform: translateY(-1px);
 }
 
 .zoom-controller {

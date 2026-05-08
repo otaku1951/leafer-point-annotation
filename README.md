@@ -14,6 +14,7 @@
 - 🔍 **画布缩放** - 支持缩放、平移、重置
 - ⌨️ **热键支持** - V/P/B/E/Ctrl+Z/Ctrl+Y 等
 - 📱 **响应式设计** - Vue3 组件化架构
+- 🖼️ **本地上传** - 支持本地图片上传和拖拽上传
 
 ## 安装
 
@@ -132,7 +133,7 @@ const exportMask = async () => {
 
 | 属性名 | 类型 | 默认值 | 说明 |
 |--------|------|--------|------|
-| imageSource | `{ id?: string; url: string }` | 必填 | 图片源配置 |
+| imageSource | `{ id?: string; url: string }` | `null` | 图片源配置（可选，不提供时显示本地上传入口） |
 | options | `Object` | `{}` | 配置选项 |
 
 #### Options 配置

@@ -14,6 +14,7 @@ A point annotation and brush painting tool based on Vue3 + LeaferJS, supporting 
 - 🔍 **Canvas Zoom** - Zoom, pan, reset support
 - ⌨️ **Hotkeys** - V/P/B/E/Ctrl+Z/Ctrl+Y and more
 - 📱 **Responsive Design** - Vue3 component architecture
+- 🖼️ **Local Upload** - Support local image upload and drag-and-drop
 
 ## Installation
 
@@ -132,7 +133,7 @@ const exportMask = async () => {
 
 | Property | Type | Default | Description |
 |----------|------|---------|-------------|
-| imageSource | `{ id?: string; url: string }` | Required | Image source configuration |
+| imageSource | `{ id?: string; url: string }` | `null` | Image source configuration (optional, shows upload UI when not provided) |
 | options | `Object` | `{}` | Configuration options |
 
 #### Options Configuration

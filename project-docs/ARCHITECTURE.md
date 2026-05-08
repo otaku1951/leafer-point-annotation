@@ -121,9 +121,15 @@ const loadStatus = ref('idle');
 const imageWidth = ref<number | null>(null);
 const imageHeight = ref<number | null>(null);
 
+// 本地图片上传状态
+const hasLocalImage = ref(false);
+const localImageUrl = ref('');
+const isDragOver = ref(false);
+
 // UI 状态
 const showBrushPanel = ref(false);
 const brushButtonRect = ref({ x: 0, y: 0, width: 0, height: 0 });
+const showTools = computed(() => loadStatus.value === 'success');
 
 // 笔刷样式
 const localBrushStyle = ref<BrushStyle>({ ...DEFAULT_BRUSH_STYLE });
@@ -136,6 +142,9 @@ const localBrushStyle = ref<BrushStyle>({ ...DEFAULT_BRUSH_STYLE });
 | pointermove | handlePointerMove | 笔刷绘制/鼠标追踪 |
 | pointerup | handlePointerUp | 完成笔刷绘制 |
 | keydown | handleKeyDown | 热键处理（tinykeys） |
+| dragover | handleDragOver | 拖拽文件时高亮边框 |
+| dragleave | handleDragLeave | 拖拽离开时取消高亮 |
+| drop | handleDrop | 拖拽文件时处理上传 |
 
 **对外 API**：
 ```typescript
@@ -344,12 +353,46 @@ const switchToSelect = () => {
 
 | 属性名 | 类型 | 默认值 | 说明 |
 |--------|------|--------|------|
-| imageSource | { id, url } | - | 图片源配置 |
+| imageSource | { id?: string, url: string } \| null | null | 图片源配置（可选，未提供时显示本地上传界面） |
 | pointStyle | Partial\<PointStyle\> | DEFAULT_POINT_STYLE | 点标注样式 |
 | brushStyle | Partial\<BrushStyle\> | DEFAULT_BRUSH_STYLE | 笔刷样式 |
 | options | { maskExportFormat, maskExportForeground } | - | 导出配置 |
 
-### 7.3 Events
+### 7.3 图片切换逻辑
+
+**图片加载策略**：
+1. 优先使用本地上传的图片（hasLocalImage 为 true）
+2. 其次使用 props.imageSource.url
+3. 无图片时显示上传界面
+
+**Props 监听**：
+```typescript
+watch(
+  () => props.imageSource?.url,
+  (newUrl, oldUrl) => {
+    if (newUrl) {
+      // 有新图片 URL，加载新图片
+      hasLocalImage.value = false;
+      localImageUrl.value = '';
+      loadImage(newUrl);
+    } else if (oldUrl && !newUrl) {
+      // 图片 URL 变空，清空画布回到上传状态
+      hasLocalImage.value = false;
+      localImageUrl.value = '';
+      clearAllAnnotationsAndBrush();
+      if (imageBox) {
+        contentLayer.clear();
+        imageBox.destroy();
+        imageBox = null;
+      }
+      loadStatus.value = 'idle';
+    }
+  },
+  { immediate: true }
+);
+```
+
+### 7.4 Events
 
 | 事件名 | 参数 | 说明 |
 |--------|------|------|
@@ -396,6 +439,6 @@ const switchToSelect = () => {
 
 ---
 
-**文档版本**：2.0  
+**文档版本**：2.1  
 **创建日期**：2026-04-28  
-**最后更新**：2026-05-02
+**最后更新**：2026-05-08
