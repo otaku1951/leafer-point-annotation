@@ -38,7 +38,7 @@ pnpm add @zzalai/leafer-point-annotation
 
 ## Quick Start
 
-### Basic Usage
+### Using Remote Image
 
 ```vue
 <template>
@@ -60,6 +60,7 @@ pnpm add @zzalai/leafer-point-annotation
 <script setup lang="ts">
 import { ref, computed } from 'vue'
 import { PointAnnotation } from '@zzalai/leafer-point-annotation'
+import '@zzalai/leafer-point-annotation/dist/leafer-point-annotation.css'
 
 const annotationRef = ref<InstanceType<typeof PointAnnotation> | null>(null)
 const imageSource = computed(() => ({
@@ -123,6 +124,59 @@ const exportMask = async () => {
   margin-top: 16px;
   display: flex;
   gap: 12px;
+}
+</style>
+```
+
+### Using Local Image Upload
+
+When not providing the `imageSource` prop, the local upload interface will be displayed, supporting click to select or drag and drop.
+
+```vue
+<template>
+  <div class="demo-container">
+    <PointAnnotation
+      ref="annotationRef"
+      :options="options"
+      @pointChange="handlePointChange"
+      @loadSuccess="handleLoadSuccess"
+    />
+  </div>
+</template>
+
+<script setup lang="ts">
+import { ref } from 'vue'
+import { PointAnnotation } from '@zzalai/leafer-point-annotation'
+import '@zzalai/leafer-point-annotation/dist/leafer-point-annotation.css'
+
+const annotationRef = ref<InstanceType<typeof PointAnnotation> | null>(null)
+
+const options = ref({
+  pointStyle: {
+    circleFill: '#ff4d4f',
+    circleStroke: '#ffffff',
+    labelBackgroundColor: '#ffffff'
+  },
+  brushStyle: {
+    color: '#ff4d4f',
+    opacity: 0.55,
+    size: 100
+  }
+})
+
+const handlePointChange = (points) => {
+  console.log('Points changed:', points)
+}
+
+const handleLoadSuccess = () => {
+  console.log('Image loaded successfully')
+}
+</script>
+
+<style scoped>
+.demo-container {
+  width: 100%;
+  height: 600px;
 }
 </style>
 ```

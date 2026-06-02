@@ -38,7 +38,7 @@ pnpm add @zzalai/leafer-point-annotation
 
 ## 快速开始
 
-### 基础使用
+### 使用远程图片
 
 ```vue
 <template>
@@ -60,6 +60,7 @@ pnpm add @zzalai/leafer-point-annotation
 <script setup lang="ts">
 import { ref, computed } from 'vue'
 import { PointAnnotation } from '@zzalai/leafer-point-annotation'
+import '@zzalai/leafer-point-annotation/dist/leafer-point-annotation.css'
 
 const annotationRef = ref<InstanceType<typeof PointAnnotation> | null>(null)
 const imageSource = computed(() => ({
@@ -123,6 +124,59 @@ const exportMask = async () => {
   margin-top: 16px;
   display: flex;
   gap: 12px;
+}
+</style>
+```
+
+### 使用本地图片上传
+
+不提供 `imageSource` prop 时，会显示本地上传界面，支持点击选择或拖拽上传。
+
+```vue
+<template>
+  <div class="demo-container">
+    <PointAnnotation
+      ref="annotationRef"
+      :options="options"
+      @pointChange="handlePointChange"
+      @loadSuccess="handleLoadSuccess"
+    />
+  </div>
+</template>
+
+<script setup lang="ts">
+import { ref } from 'vue'
+import { PointAnnotation } from '@zzalai/leafer-point-annotation'
+import '@zzalai/leafer-point-annotation/dist/leafer-point-annotation.css'
+
+const annotationRef = ref<InstanceType<typeof PointAnnotation> | null>(null)
+
+const options = ref({
+  pointStyle: {
+    circleFill: '#ff4d4f',
+    circleStroke: '#ffffff',
+    labelBackgroundColor: '#ffffff'
+  },
+  brushStyle: {
+    color: '#ff4d4f',
+    opacity: 0.55,
+    size: 100
+  }
+})
+
+const handlePointChange = (points) => {
+  console.log('标注点变化:', points)
+}
+
+const handleLoadSuccess = () => {
+  console.log('图片加载成功')
+}
+</script>
+
+<style scoped>
+.demo-container {
+  width: 100%;
+  height: 600px;
 }
 </style>
 ```

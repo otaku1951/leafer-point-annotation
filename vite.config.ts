@@ -6,7 +6,12 @@ import path from 'path'
 export default defineConfig({
   plugins: [
     vue(),
-    process.env.NODE_ENV === 'production' ? dts() : null
+    process.env.NODE_ENV === 'production' ? dts({
+      outDirs: ['dist'],
+      include: ['src/**/*.ts', 'src/**/*.vue'],
+      exclude: ['src/**/*.spec.ts', 'src/**/*.test.ts'],
+      tsconfigPath: './tsconfig.json'
+    }) : null
   ].filter(Boolean),
   resolve: {
     alias: {
