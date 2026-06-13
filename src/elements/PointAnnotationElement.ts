@@ -1,4 +1,5 @@
-import { Group, Ellipse, Text } from 'leafer-ui';
+import { Group, Ellipse, Text, PointerEvent } from 'leafer-ui';
+// import { EllipseBox } from '@leafer-in/box'
 import type { PointAnnotation, PointStyle } from '@/types';
 import { DEFAULT_POINT_STYLE } from '@/types';
 import "@leafer-in/state"
@@ -6,6 +7,7 @@ import "@leafer-in/text-editor"
 
 export class PointAnnotationElement extends Group {
   public circle: Ellipse;
+  public circleText: Text;
   public label: Text;
   public data: PointAnnotation;
   private style: PointStyle;
@@ -18,6 +20,32 @@ export class PointAnnotationElement extends Group {
     this.data = data;
     this.style = { ...DEFAULT_POINT_STYLE, ...style };
     this._lastValidLabel = data.label;
+
+    // 创建圆点文本
+    this.circleText = new Text({
+      x: - this.style.circleRadius / 2,
+      y: - this.style.circleRadius / 2,
+      text: data.order,
+      width: this.style.circleRadius,
+      height: this.style.circleRadius,
+      lineHeight: this.style.circleRadius,
+      fontSize: this.style.circleTextFontSize,
+      fontFamily: this.style.circleTextFontFamily,
+      fill: this.style.circleTextFill,
+      editable: false,
+      editConfig: {
+        strokeWidth: 0, // 需要置0，否则有边难看
+        moveable: false,
+        resizeable: false
+      },
+      // around: 'center',
+      textAlign: 'center',
+      // boxStyle: {
+      //   fill: this.style.labelBackgroundColor,
+      // }
+    });
+
+
 
     // 创建圆点 - Ellipse 的 x, y 是圆心位置，around 设置为 center
     this.circle = new Ellipse({
@@ -44,7 +72,7 @@ export class PointAnnotationElement extends Group {
       fontSize: this.style.labelFontSize,
       fill: this.style.labelTextColor,
       padding: this.style.labelPadding,
-      editable: true,
+      editable: false,
       editConfig: {
         strokeWidth: 0, // 需要置0，否则有边难看
         moveable: false,
@@ -66,6 +94,7 @@ export class PointAnnotationElement extends Group {
 
     // 添加到组
     this.add(this.circle);
+    this.add(this.circleText);
     this.add(this.label);
 
     // 设置组属性 - 组的位置就是圆心位置
@@ -73,7 +102,8 @@ export class PointAnnotationElement extends Group {
     this.y = data.pixel.y;
     this.draggable = true;
     this.editable = true;
-    // this.hitChildren = false;
+    this.hitChildren = true;
+    // this.hitChildren = true;
     this.editConfig = {
       strokeWidth: 0, // 需要置0，否则有边难看
       resizeable: false
@@ -85,6 +115,20 @@ export class PointAnnotationElement extends Group {
   }
 
   private bindEvents(): void {
+    this.on(PointerEvent.ENTER, () => {
+      this.circle.set({
+        fill: this.style.selectedCircleFill,
+        stroke: this.style.selectedCircleStroke,
+      })
+      // this.label.editable = true;
+    })
+    this.on(PointerEvent.LEAVE, () => {
+      this.circle.set({
+        fill: this.style.circleFill,
+        stroke: this.style.circleStroke,
+      })
+      // this.label.editable = false;
+    })
     // Hover 效果已通过 hoverStyle 配置，无需监听事件
     // this.circle.on('pointerenter', () => this.updateHover(true));
     // this.circle.on('pointerleave', () => this.updateHover(false));

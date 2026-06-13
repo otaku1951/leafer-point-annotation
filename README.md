@@ -15,6 +15,7 @@
 - ⌨️ **热键支持** - V/P/B/E/Ctrl+Z/Ctrl+Y 等
 - 📱 **响应式设计** - Vue3 组件化架构
 - 🖼️ **本地上传** - 支持本地图片上传和拖拽上传
+- 📚 **多图层笔刷** - 支持配置多个笔刷图层（如遮罩区域/遮挡区域），图层独立管理与导出
 
 ## 安装
 
@@ -181,6 +182,58 @@ const handleLoadSuccess = () => {
 </style>
 ```
 
+## 多图层笔刷使用
+
+当业务需要区分不同类型的涂抹区域（例如「遮罩区域」与「遮挡区域」）时，可通过 `options.brushLayers` 配置多个图层。
+
+### 基本用法
+
+```vue
+<template>
+  <PointAnnotation
+    ref="annotationRef"
+    :imageSource="imageSource"
+    :options="options"
+    v-model:currentLayer="activeLayer"
+  />
+</template>
+
+<script setup lang="ts">
+import { ref, computed } from 'vue'
+import { PointAnnotation } from '@zzalai/leafer-point-annotation'
+import '@zzalai/leafer-point-annotation/dist/leafer-point-annotation.css'
+
+const annotationRef = ref<InstanceType<typeof PointAnnotation> | null>(null)
+const imageSource = computed(() => ({ url: 'https://example.com/image.jpg' }))
+const activeLayer = ref('foreground')
+
+const options = ref({
+  brushStyle: { color: '#ff4d4f', opacity: 0.55, size: 100 },
+  brushLayers: [
+    { label: '前景区域', value: 'foreground' },
+    { label: '背景区域', value: 'background' },
+    { label: '忽略区域', value: 'ignore' }
+  ],
+  maxBrushLayers: 8
+})
+
+// 导出所有图层的二值图
+const exportAll = async () => {
+  const masks = await annotationRef.value?.exportAllMaskImages()
+  console.log('各图层 mask:', masks)
+  // { foreground: 'data:image/png;base64,...', background: '...', ignore: '...' }
+}
+</script>
+```
+
+**说明：**
+
+- 配置 `brushLayers` 后，工具栏会自动出现图层下拉选择器
+- 每个图层独立维护自己的笔刷绘制内容，互不干扰
+- `exportCanvasJSON` 会包含所有图层数据，`importCanvasJSON` 可完整恢复
+- 未配置 `brushLayers` 时，保持单图层模式，与旧版本完全兼容
+- 通过 `v-model:currentLayer` 可让父组件驱动图层切换
+
 ## API 文档
 
 ### Props
@@ -189,6 +242,7 @@ const handleLoadSuccess = () => {
 |--------|------|--------|------|
 | imageSource | `{ id?: string; url: string }` | `null` | 图片源配置（可选，不提供时显示本地上传入口） |
 | options | `Object` | `{}` | 配置选项 |
+| currentLayer | `string` | `undefined` | 当前激活的笔刷图层（支持父组件驱动切换，v-model:currentLayer） |
 
 #### Options 配置
 
@@ -196,9 +250,16 @@ const handleLoadSuccess = () => {
 interface Options {
   pointStyle?: Partial<PointStyle>
   brushStyle?: Partial<BrushStyle>
+  brushLayers?: BrushLayerConfig[]  // 多图层配置，默认无则使用单图层
+  maxBrushLayers?: number            // 最大图层数上限，默认 8
   maskExportFormat?: 'png' | 'jpg' | 'jpeg'
   maskExportForeground?: 'black' | 'white'
   maxUndoSteps?: number
+}
+
+interface BrushLayerConfig {
+  label: string    // 下拉选择器显示名称
+  value: string    // 图层唯一标识
 }
 ```
 
@@ -247,6 +308,7 @@ interface BrushStyle {
 | loadError | `error` | 图片加载失败时触发 |
 | undoStateChange | - | 撤销状态变化时触发 |
 | redoStateChange | - | 重做状态变化时触发 |
+| update:currentLayer | `string` | 当前图层切换时触发（与 currentLayer prop 配合使用） |
 
 ### Methods
 
@@ -256,13 +318,19 @@ interface BrushStyle {
 |--------|------|--------|------|
 | getPointAnnotations | - | `PointAnnotation[]` | 获取所有点标注数据 |
 | getImageInfo | - | `Object` | 获取图片信息 |
-| exportCanvasJSON | - | `string` | 导出完整 JSON 数据 |
-| exportMaskImage | `format?`, `fgColor?` | `Promise<string|null>` | 导出二值图 |
+| exportCanvasJSON | - | `string` | 导出完整 JSON 数据（包含所有图层） |
+| exportMaskImage | `format?`, `fgColor?` | `Promise<string\|null>` | 导出当前激活图层的二值图 |
+| exportMaskImageByLayer | `layerValue`, `format?`, `fgColor?` | `Promise<string\|null>` | 导出指定图层的二值图 |
+| exportAllMaskImages | `format?`, `fgColor?` | `Promise<Record<string,string>>` | 导出所有图层的二值图（key 为图层 value） |
 | exportCOCO | - | `string` | 导出 COCO 格式 JSON |
 | exportYOLO | - | `{ annotations: string; classNames: string }` | 导出 YOLO 格式 |
-| importCanvasJSON | `jsonString`, `options?` | `Promise<boolean>` | 导入 JSON 数据 |
+| importCanvasJSON | `jsonString`, `options?` | `Promise<boolean>` | 导入 JSON 数据（兼容多图层） |
 | loadImage | `url?` | `Promise<void>` | 加载图片 |
-| clearBrush | - | `void` | 清除笔刷内容 |
+| clearBrush | - | `void` | 清除当前激活图层的笔刷内容 |
+| clearAllBrushLayers | - | `void` | 清除所有图层的笔刷内容 |
+| getCurrentLayer | - | `string` | 获取当前激活的图层 value |
+| setActiveLayer | `layerValue` | `void` | 切换到指定图层 |
+| getAllLayers | - | `BrushLayerConfig[]` | 获取所有图层配置 |
 | zoomIn | - | `void` | 放大画布 |
 | zoomOut | - | `void` | 缩小画布 |
 | resetZoom | - | `void` | 重置缩放 |

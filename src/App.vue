@@ -7,10 +7,12 @@
         ref="pointAnnotation"
         :imageSource="imageSource" 
         :options="editorOptions"
+        v-model:currentLayer="activeLayer"
         @pointChange="handlePointChange"
         @loadStart="handleLoadStart"
         @loadSuccess="handleLoadSuccess"
         @loadError="handleLoadError"
+        @update:currentLayer="handleLayerChange"
       />
     </div>
     
@@ -22,8 +24,27 @@
           type="text" 
           id="imageUrl" 
           v-model="imageUrl" 
-          placeholder="Enter image URL"
+          placeholder="Enter image URL (or leave empty for local upload)"
         />
+      </div>
+
+      <div class="control-group">
+        <h3>Multi-Layer Mode</h3>
+        <div class="multi-layer-row">
+          <label>
+            <input type="checkbox" v-model="useMultiLayer" />
+            Enable multi-layer brush
+          </label>
+          <span class="layer-info">Active layer: <b>{{ activeLayer }}</b></span>
+        </div>
+        <div class="multi-layer-row" v-if="useMultiLayer">
+          <label>Switch layer (parent-driven):</label>
+          <select v-model="activeLayer">
+            <option v-for="l in layerConfig" :key="l.value" :value="l.value">{{ l.label }} ({{ l.value }})</option>
+          </select>
+          <button @click="printAllLayers">Log All Layers</button>
+          <button @click="printCurrentLayer">Log Current Layer</button>
+        </div>
       </div>
       
       <div class="control-group">
@@ -46,6 +67,45 @@
       </div>
       
       <div class="control-group">
+        <h3>Custom Toolbar (via ref)</h3>
+        <p class="subtle">隐藏组件自带工具栏后，父组件自定义按钮调用 API 替代</p>
+        <div class="multi-layer-row">
+          <label><input type="checkbox" v-model="showToolbar" /> 显示组件工具栏</label>
+          <label><input type="checkbox" v-model="showZoomController" /> 显示缩放控制器</label>
+        </div>
+        <div class="multi-layer-row">
+          <label>背景色: <input type="color" v-model="canvasBackground" style="width: 40px; height: 28px; vertical-align: middle; margin-left: 6px;" /></label>
+          <label>最小缩放: <input type="number" v-model.number="zoomMin" step="0.1" min="0.01" max="1" style="width: 70px; margin-left: 6px;" /></label>
+          <label>最大缩放: <input type="number" v-model.number="zoomMax" step="0.5" min="1" max="32" style="width: 70px; margin-left: 6px;" /></label>
+        </div>
+        <p class="subtle">注：画布背景色和缩放范围在图片加载时生效，修改后请重新加载图片</p>
+        <div class="multi-layer-row">
+          <button
+            :class="{ 'active-btn': currentToolValue === 'select' }"
+            @click="pointAnnotation?.selectTool()"
+          >选择工具</button>
+          <button
+            :class="{ 'active-btn': currentToolValue === 'point' }"
+            @click="pointAnnotation?.pointTool()"
+          >点标注工具</button>
+          <button
+            :class="{ 'active-btn': currentToolValue === 'brush' }"
+            @click="pointAnnotation?.brushTool(false)"
+          >笔刷工具</button>
+          <button
+            :class="{ 'active-btn': currentToolValue === 'eraser' }"
+            @click="pointAnnotation?.eraserTool()"
+          >橡皮擦</button>
+        </div>
+        <div class="multi-layer-row">
+          <button @click="pointAnnotation?.undo()">↶ 撤销</button>
+          <button @click="pointAnnotation?.redo()">↷ 重做</button>
+          <button @click="pointAnnotation?.deleteSelected()">🗑 删除当前</button>
+          <button @click="pointAnnotation?.clearAllAnnotationsAndBrush()">⚠ 清除全部</button>
+        </div>
+      </div>
+
+      <div class="control-group">
         <h3>Brush Mask Export</h3>
         <div class="mask-options">
           <label>
@@ -63,8 +123,51 @@
             </select>
           </label>
         </div>
-        <button @click="exportMaskImage">Export Mask Image</button>
-        <button @click="clearBrush">Clear Brush</button>
+        <button @click="exportMaskImage">Export Current Layer Mask</button>
+        <button @click="clearBrush">Clear Current Layer Brush</button>
+        <button @click="clearAllBrushLayers" v-if="useMultiLayer">Clear ALL Layers</button>
+      </div>
+
+      <div class="control-group">
+        <h3>Brush Style (via ref API)</h3>
+        <p class="subtle">通过组件 ref 调用 updateBrushStyle / getBrushStyle，可单独修改任一字段</p>
+        <div class="multi-layer-row">
+          <button @click="pointAnnotation?.updateBrushStyle({ color: '#ff4d4f' })">🟥 红色</button>
+          <button @click="pointAnnotation?.updateBrushStyle({ color: '#52c41a' })">🟩 绿色</button>
+          <button @click="pointAnnotation?.updateBrushStyle({ color: '#1890ff' })">🟦 蓝色</button>
+          <button @click="pointAnnotation?.updateBrushStyle({ color: '#faad14' })">🟨 黄色</button>
+        </div>
+        <div class="multi-layer-row">
+          <label>Size: {{ brushStyleSize }}</label>
+          <input type="range" min="5" max="300" :value="brushStyleSize" @input="onSizeChange($event)" />
+          <button @click="pointAnnotation?.updateBrushStyle({ size: 100 })">Reset Size</button>
+        </div>
+        <div class="multi-layer-row">
+          <label>Opacity: {{ brushStyleOpacity }}</label>
+          <input type="range" min="0.1" max="1" step="0.05" :value="brushStyleOpacity" @input="onOpacityChange($event)" />
+          <button @click="pointAnnotation?.updateBrushStyle({ opacity: 0.55 })">Reset Opacity</button>
+        </div>
+        <div class="multi-layer-row">
+          <label>Continuity: {{ brushStyleContinuity }}</label>
+          <input type="range" min="5" max="50" :value="brushStyleContinuity" @input="onContinuityChange($event)" />
+          <button @click="pointAnnotation?.updateBrushStyle({ continuity: 20 })">Reset Continuity</button>
+        </div>
+        <div class="multi-layer-row">
+          <button @click="printBrushStyle">Log Current Brush Style</button>
+          <button @click="pointAnnotation?.updateBrushStyle({ color: '#ff4d4f', size: 100, opacity: 0.55, continuity: 20 })">Restore All Defaults</button>
+        </div>
+      </div>
+
+      <div class="control-group" v-if="useMultiLayer">
+        <h3>Per-Layer Mask Export</h3>
+        <div class="multi-layer-row">
+          <label>Layer:</label>
+          <select v-model="exportLayerValue">
+            <option v-for="l in layerConfig" :key="l.value" :value="l.value">{{ l.label }} ({{ l.value }})</option>
+          </select>
+          <button @click="exportMaskByLayer">Export This Layer Mask</button>
+        </div>
+        <button @click="exportAllLayerMasks">Export ALL Layer Masks (zip by browser)</button>
       </div>
 
       <div class="control-group">
@@ -107,13 +210,16 @@
     <div class="status">
       <h2>Status</h2>
       <p>Image Load Status: {{ loadStatus }}</p>
+      <p>Multi-Layer Mode: {{ useMultiLayer ? 'ON' : 'OFF' }}</p>
+      <p v-if="useMultiLayer">Active Layer (v-model:currentLayer): <b>{{ activeLayer }}</b></p>
     </div>
   </div>
 </template>
 
 <script setup lang="ts">
-import { ref, computed } from 'vue'
+import { ref, computed, watch } from 'vue'
 import PointAnnotation from './components/PointAnnotation.vue'
+import type { OptionsSource } from './components/PointAnnotation.vue'
 
 // 图片URL
 const imageUrl = ref('')
@@ -125,21 +231,65 @@ const imageSource = computed(() => {
   }
 })
 
-// 编辑器选项
-const editorOptions = ref({
+// --- 多图层相关 ---
+const useMultiLayer = ref(false)
+const layerConfig = [
+  { label: '前景区域', value: 'foreground' },
+  { label: '背景区域', value: 'background' },
+  { label: '忽略区域', value: 'ignore' }
+]
+const activeLayer = ref<string>('foreground')
+const exportLayerValue = ref<string>('foreground')
+
+// 当切换到多图层模式时，重置 activeLayer 到默认第一个
+watch(useMultiLayer, (enabled) => {
+  if (enabled) {
+    activeLayer.value = layerConfig[0].value
+    exportLayerValue.value = layerConfig[0].value
+  }
+})
+
+// 编辑器选项（根据 useMultiLayer 动态注入 brushLayers）
+const baseOptions: OptionsSource = {
   pointStyle: {
-    fill: '#f00',
-    stroke: '#fff',
-    strokeWidth: 2,
-    width: 16,
-    height: 16,
-    radius: 8
+    circleFill: '#00f',
+    circleStroke: '#fff',
+    selectedCircleFill: '#f00',
+    selectedCircleStroke: '#fff'
   },
-  selectedPointStyle: {
-    fill: '#00f',
-    stroke: '#fff',
-    strokeWidth: 2,
-    radius: 10
+  brushStyle: {
+    color: '#ff4d4f',
+    opacity: 0.55,
+    size: 100
+  }
+}
+
+const showToolbar = ref(false)
+const showZoomController = ref(true)
+const canvasBackground = ref('#f6f6f6')
+const zoomMin = ref(0.2)
+const zoomMax = ref(4)
+
+const editorOptions = computed<OptionsSource>(() => {
+  if (useMultiLayer.value) {
+    return {
+      ...baseOptions,
+      brushLayers: layerConfig,
+      maxBrushLayers: 8,
+      showToolbar: showToolbar.value,
+      showZoomController: showZoomController.value,
+      canvasBackground: canvasBackground.value,
+      zoomMin: zoomMin.value,
+      zoomMax: zoomMax.value
+    }
+  }
+  return {
+    ...baseOptions,
+    showToolbar: showToolbar.value,
+    showZoomController: showZoomController.value,
+    canvasBackground: canvasBackground.value,
+    zoomMin: zoomMin.value,
+    zoomMax: zoomMax.value
   }
 })
 
@@ -152,6 +302,48 @@ const maskForeground = ref<'black' | 'white'>('black')
 const currentTool = ref<'select' | 'point' | 'brush' | 'eraser'>('select')
 const currentToolDisplay = ref('select')
 const lastAddedPointId = ref<string | null>(null)
+
+// 用于 UI 轮询显示当前笔刷样式（每 500ms 触发一次刷新）
+const brushStyleTick = ref(0)
+setInterval(() => { brushStyleTick.value++ }, 500)
+
+const currentBrushStyle = computed(() => {
+  brushStyleTick.value
+  return pointAnnotation.value?.getBrushStyle?.() || {
+    color: '#ff4d4f', opacity: 0.55, size: 100, continuity: 20, minSize: 5, maxSize: 300
+  }
+})
+const brushStyleSize = computed(() => currentBrushStyle.value.size)
+const brushStyleOpacity = computed(() => currentBrushStyle.value.opacity)
+const brushStyleContinuity = computed(() => currentBrushStyle.value.continuity)
+
+const currentToolValue = computed(() => {
+  brushStyleTick.value
+  return pointAnnotation.value?.getCurrentTool?.() || 'select'
+})
+
+const onSizeChange = (e: Event) => {
+  const val = Number((e.target as HTMLInputElement).value)
+  pointAnnotation.value?.updateBrushStyle({ size: val })
+}
+const onOpacityChange = (e: Event) => {
+  const val = Number((e.target as HTMLInputElement).value)
+  pointAnnotation.value?.updateBrushStyle({ opacity: val })
+}
+const onContinuityChange = (e: Event) => {
+  const val = Number((e.target as HTMLInputElement).value)
+  pointAnnotation.value?.updateBrushStyle({ continuity: val })
+}
+const printBrushStyle = () => {
+  const style = pointAnnotation.value?.getBrushStyle?.()
+  console.log('Current brush style:', style)
+  alert('Brush style logged to console:\n' + JSON.stringify(style, null, 2))
+}
+
+// 父组件感知图层切换
+const handleLayerChange = (layer: string) => {
+  console.log('[App.vue] Layer changed via event:', layer)
+}
 
 // 处理点变化
 const handlePointChange = (data: any) => {
@@ -360,6 +552,68 @@ const testRemovePoint = () => {
     }
   }
 }
+
+// --- 多图层 API 测试方法 ---
+const printAllLayers = () => {
+  if (!pointAnnotation.value) return
+  const layers = pointAnnotation.value.getAllLayers?.()
+  console.log('All layers:', layers)
+  alert('Layers printed to console: ' + JSON.stringify(layers, null, 2))
+}
+
+const printCurrentLayer = () => {
+  if (!pointAnnotation.value) return
+  const layer = pointAnnotation.value.getCurrentLayer?.()
+  console.log('Current layer:', layer)
+  alert('Current layer: ' + layer)
+}
+
+const clearAllBrushLayers = () => {
+  if (!pointAnnotation.value) return
+  pointAnnotation.value.clearAllBrushLayers?.()
+  alert('All brush layers cleared!')
+}
+
+const exportMaskByLayer = async () => {
+  if (!pointAnnotation.value) return
+  const mask = await pointAnnotation.value.exportMaskImageByLayer?.(
+    exportLayerValue.value,
+    maskFormat.value,
+    maskForeground.value
+  )
+  if (mask) {
+    const ext = maskFormat.value === 'png' ? 'png' : 'jpg'
+    const a = document.createElement('a')
+    a.href = mask
+    a.download = `brush-mask-${exportLayerValue.value}.${ext}`
+    a.click()
+  } else {
+    alert(`No brush data on layer "${exportLayerValue.value}"`)
+  }
+}
+
+const exportAllLayerMasks = async () => {
+  if (!pointAnnotation.value) return
+  const masks = await pointAnnotation.value.exportAllMaskImages?.(
+    maskFormat.value,
+    maskForeground.value
+  )
+  if (!masks || Object.keys(masks).length === 0) {
+    alert('No brush data on any layer')
+    return
+  }
+  const ext = maskFormat.value === 'png' ? 'png' : 'jpg'
+  // 浏览器逐一下载每个图层的 mask
+  Object.entries(masks).forEach(([layerValue, maskData], idx) => {
+    setTimeout(() => {
+      const a = document.createElement('a')
+      a.href = maskData
+      a.download = `brush-mask-${layerValue}.${ext}`
+      a.click()
+    }, idx * 300) // 延迟避免浏览器拦截连续下载
+  })
+  alert(`Started downloading ${Object.keys(masks).length} mask images`)
+}
 </script>
 
 <style scoped>
@@ -463,5 +717,58 @@ pre {
   padding: 20px;
   background-color: #f5f5f5;
   border-radius: 8px;
+}
+
+.multi-layer-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 8px;
+  flex-wrap: wrap;
+}
+
+.multi-layer-row > label {
+  margin: 0;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-weight: normal;
+}
+
+.multi-layer-row > select {
+  padding: 6px 10px;
+  border: 1px solid #ddd;
+  border-radius: 4px;
+  font-size: 14px;
+}
+
+.multi-layer-row > button {
+  margin-right: 0;
+}
+
+.layer-info {
+  font-size: 14px;
+  color: #555;
+}
+
+.layer-info b {
+  color: #007bff;
+}
+
+.subtle {
+  font-size: 13px;
+  color: #888;
+  margin: 0 0 8px 0;
+}
+
+.active-btn {
+  background-color: var(--leafer-point-color-primary, #409eff);
+  color: white;
+  border-color: var(--leafer-point-color-primary, #409eff);
+}
+
+.active-btn:hover {
+  background-color: var(--leafer-point-color-primary, #409eff);
+  opacity: 0.9;
 }
 </style>

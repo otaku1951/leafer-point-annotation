@@ -8,6 +8,9 @@ importers:
 
   .:
     dependencies:
+      '@leafer-in/box':
+        specifier: ^2.1.6
+        version: 2.1.6(@leafer-in/interface@2.1.0(@leafer-ui/interface@2.1.0)(@leafer/interface@2.1.0))(@leafer-ui/draw@2.1.0)(@leafer-ui/interface@2.1.0)
       '@leafer-in/editor':
         specifier: ^2.0.8
         version: 2.1.0(@leafer-in/interface@2.1.0(@leafer-ui/interface@2.1.0)(@leafer/interface@2.1.0))(@leafer-in/resize@2.1.0(@leafer-in/interface@2.1.0(@leafer-ui/interface@2.1.0)(@leafer/interface@2.1.0))(@leafer-ui/draw@2.1.0)(@leafer-ui/interface@2.1.0))(@leafer-ui/core@2.1.0)(@leafer-ui/draw@2.1.0)(@leafer-ui/interface@2.1.0)
@@ -110,6 +113,13 @@ packages:
 
   '@jridgewell/trace-mapping@0.3.31':
     resolution: {integrity: sha512-zzNR+SdQSDJzc8joaeP8QQoCQr8NuYx2dIIytl1QeBEZHJ9uW6hebsrYgbz8hJwUQao3TWCMtmfV8Nu1twOLAw==}
+
+  '@leafer-in/box@2.1.6':
+    resolution: {integrity: sha512-o5abbZMkvhDbSuG87BKiZp0ZKfVsg6dfEpRYdBgsJPSPTME9CO+I1kgYwkBskfNJIXxX3OBm55IlTFMqx9Lk8A==}
+    peerDependencies:
+      '@leafer-in/interface': ^2.1.6
+      '@leafer-ui/draw': ^2.1.6
+      '@leafer-ui/interface': ^2.1.6
 
   '@leafer-in/editor@2.1.0':
     resolution: {integrity: sha512-gSO0I6t+wWRvD9Ul2pmj6l1oXdqs1Rvay3RgAi2j/dY59eh05wkDS7YZGR/gy0bE+v7ZZxnX8mZuSEH+iu626A==}
@@ -1065,6 +1075,12 @@ snapshots:
     dependencies:
       '@jridgewell/resolve-uri': 3.1.2
       '@jridgewell/sourcemap-codec': 1.5.5
+
+  '@leafer-in/box@2.1.6(@leafer-in/interface@2.1.0(@leafer-ui/interface@2.1.0)(@leafer/interface@2.1.0))(@leafer-ui/draw@2.1.0)(@leafer-ui/interface@2.1.0)':
+    dependencies:
+      '@leafer-in/interface': 2.1.0(@leafer-ui/interface@2.1.0)(@leafer/interface@2.1.0)
+      '@leafer-ui/draw': 2.1.0
+      '@leafer-ui/interface': 2.1.0
 
   '@leafer-in/editor@2.1.0(@leafer-in/interface@2.1.0(@leafer-ui/interface@2.1.0)(@leafer/interface@2.1.0))(@leafer-in/resize@2.1.0(@leafer-in/interface@2.1.0(@leafer-ui/interface@2.1.0)(@leafer/interface@2.1.0))(@leafer-ui/draw@2.1.0)(@leafer-ui/interface@2.1.0))(@leafer-ui/core@2.1.0)(@leafer-ui/draw@2.1.0)(@leafer-ui/interface@2.1.0)':
     dependencies:
