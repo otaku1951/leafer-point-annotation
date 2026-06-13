@@ -25,7 +25,7 @@ export class PointAnnotationElement extends Group {
     this.circleText = new Text({
       x: - this.style.circleRadius / 2,
       y: - this.style.circleRadius / 2,
-      text: data.order,
+      text: data.sequenceNumber ?? data.order,  // 优先显示当前位置序号，兼容旧数据回退到 order
       width: this.style.circleRadius,
       height: this.style.circleRadius,
       lineHeight: this.style.circleRadius,
@@ -195,5 +195,13 @@ export class PointAnnotationElement extends Group {
 
   public getLastValidLabel(): string {
     return this._lastValidLabel;
+  }
+
+  // 更新圆内显示的序号（重排时调用）
+  public updateSequenceNumber(newNum: number): void {
+    this.data.sequenceNumber = newNum;
+    if (this.circleText) {
+      this.circleText.text = String(newNum);
+    }
   }
 }

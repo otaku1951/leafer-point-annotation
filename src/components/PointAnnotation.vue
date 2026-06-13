@@ -882,6 +882,9 @@ const importCanvasJSON = async (
       activeCanvasBrush.value.restoreImageData(data.brushMask);
     }
 
+    // 重排导入点的序号（确保显示为连续数字，兼容旧数据）
+    renumberSequenceNumbers();
+
     changePointScaleRelativeCanvas(pointLayer);
 
     return true;
@@ -1354,6 +1357,7 @@ const createPointAnnotation = (pixelX: number, pixelY: number): string | null =>
   const id = `point_${pointCounter.value}`
   const label = `#${pointCounter.value}`;
   const order = pointCounter.value;
+  const sequenceNumber = pointAnnotations.value.length + 1;
 
   // 计算归一化坐标
   const normalizedX = pixelX / imageWidth.value;
@@ -1362,6 +1366,7 @@ const createPointAnnotation = (pixelX: number, pixelY: number): string | null =>
   const pointData: PointAnnotation = {
     id,
     order,
+    sequenceNumber,
     pixel: { x: pixelX, y: pixelY },
     normalized: { x: normalizedX, y: normalizedY },
     label,
@@ -1448,6 +1453,9 @@ const deleteSelected = () => {
   // 清除编辑器选择
   app.editor.cancel();
 
+  // 重排剩余点的序号
+  renumberSequenceNumbers();
+
   // 触发事件
   emit("pointChange", [...pointAnnotations.value]);
 };
@@ -1515,12 +1523,16 @@ const getPointAnnotations = (): PointAnnotation[] => {
 const undo = () => {
   if (commandManager?.canUndo()) {
     commandManager.undo();
+    renumberSequenceNumbers();
+    emit("pointChange", [...pointAnnotations.value]);
   }
 };
 
 const redo = () => {
   if (commandManager?.canRedo()) {
     commandManager.redo();
+    renumberSequenceNumbers();
+    emit("pointChange", [...pointAnnotations.value]);
   }
 };
 
@@ -1530,6 +1542,23 @@ const getCurrentTool = (): "select" | "point" | "brush" | "eraser" => {
 
 const setTool = (tool: "select" | "point" | "brush" | "eraser") => {
   currentTool.value = tool;
+};
+
+// 根据当前数组顺序重排所有点的显示序号（sequenceNumber）
+const renumberSequenceNumbers = () => {
+  // 1. 更新数据中的 sequenceNumber
+  pointAnnotations.value.forEach((p, i) => {
+    p.sequenceNumber = i + 1;
+  });
+
+  // 2. 按数据顺序查找对应 DOM 元素并更新 circleText.text
+  //    （注意：pointLayer.children 顺序可能与 pointAnnotations 不一致，比如 undo/redo 后）
+  pointAnnotations.value.forEach((p, i) => {
+    const child = pointLayer.children.find((el: any) => el.data?.id === p.id) as PointAnnotationElement;
+    if (child?.updateSequenceNumber) {
+      child.updateSequenceNumber(i + 1);
+    }
+  });
 };
 
 const removePointAnnotation = (id: string): boolean => {
@@ -1547,6 +1576,9 @@ const removePointAnnotation = (id: string): boolean => {
     element.destroy();
     pointAnnotations.value.splice(index, 1);
   }
+
+  // 重排所有点的序号
+  renumberSequenceNumbers();
 
   emit("pointChange", [...pointAnnotations.value]);
   return true;

@@ -1,7 +1,8 @@
 // 点标注数据结构
 export interface PointAnnotation {
   id: string;
-  order: number,
+  order: number;  // 创建时的顺序（永久不变，用于 ID 生成和历史记录）
+  sequenceNumber: number;  // 当前位置的显示序号（会随增删点自动重排）
   pixel: {
     x: number;
     y: number;
