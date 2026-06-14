@@ -2,20 +2,52 @@
 
 [English](README_EN.md) | 中文
 
-基于 Vue3 + LeaferJS 的点标注与笔刷涂抹工具，支持导出 COCO/YOLO/JSON 格式，专为 AI 模型训练数据集标注设计。
+> 基于 **Vue 3 + LeaferJS** 的图像点标注与笔刷涂抹工具，支持导出 COCO/YOLO/JSON 格式，专为 AI 模型训练数据集标注设计。
 
-## 功能特点
+- 📍 点标注（可拖拽、可编辑、自动重排、hover/selected 状态）
+- 🖌️ 多图层笔刷涂抹与擦除（颜色、透明度、大小、连续性可调）
+- 🔀 一键根据点标注的轨迹生成笔刷多边形区域
+- 🖼️ 本地图片上传（点击 + 拖拽）或远程图片
+- 🎨 完整的点/笔刷样式自定义
+- ⬅️ 撤销 / 重做（Command 模式）
+- 📤 多格式导出：JSON / COCO / YOLO / Mask (dataURL / Blob / File)
+- 📱 支持自定义工具栏（隐藏内置工具栏，调用 ref API 自行构建）
+- 🔒 `enableBrush: false` 可完全禁用笔刷，仅保留点标注
+- ⌨️ 丰富的键盘快捷键（`v` `p` `b` `e` `Ctrl+Z` `Ctrl+Y` `Delete` 等）
 
-- 📍 **点标注** - 在图片上添加可编辑的标注点
-- 🖌️ **笔刷涂抹** - 自由涂抹，支持擦除
-- 🎨 **自定义样式** - 笔刷颜色、大小、透明度可配置
-- 🔄 **撤销/重做** - 完整的历史记录管理
-- 📤 **多格式导出** - JSON/COCO/YOLO/二值图
-- 🔍 **画布缩放** - 支持缩放、平移、重置
-- ⌨️ **热键支持** - V/P/B/E/Ctrl+Z/Ctrl+Y 等
-- 📱 **响应式设计** - Vue3 组件化架构
-- 🖼️ **本地上传** - 支持本地图片上传和拖拽上传
-- 📚 **多图层笔刷** - 支持配置多个笔刷图层（如遮罩区域/遮挡区域），图层独立管理与导出
+---
+
+## 目录
+
+- [安装](#安装)
+- [快速开始](#快速开始)
+- [Props 配置](#props-配置)
+  - [imageSource](#imagesource)
+  - [options](#options)
+  - [currentLayer（v-model:currentLayer）](#currentlayerv-modelcurrentlayer)
+- [Events 事件](#events-事件)
+- [Ref API（父组件调用）](#ref-api父组件调用)
+  - [点标注](#点标注)
+  - [图片 & 画布](#图片-画布)
+  - [工具切换](#工具切换)
+  - [删除 & 清空](#删除-清空)
+  - [笔刷图层](#笔刷图层)
+  - [笔刷样式](#笔刷样式)
+  - [点轨迹生成笔刷区域](#点轨迹生成笔刷区域)
+  - [缩放](#缩放)
+  - [撤销 / 重做](#撤销-重做)
+  - [导入 / 导出](#导入-导出)
+- [使用示例](#使用示例)
+  - [最小示例](#最小示例)
+  - [完整自定义（隐藏内置工具栏）](#完整自定义隐藏内置工具栏)
+  - [多图层笔刷](#多图层笔刷)
+  - [后端上传 Mask（Blob/File）](#后端上传-mask-blobfile)
+  - [只启用点标注（禁用笔刷）](#只启用点标注禁用笔刷)
+- [快捷键](#快捷键)
+- [开发与构建](#开发与构建)
+- [许可证](#许可证)
+
+---
 
 ## 安装
 
@@ -37,112 +69,358 @@ yarn add @zzalai/leafer-point-annotation
 pnpm add @zzalai/leafer-point-annotation
 ```
 
-## 快速开始
+> ⚠️ 注意：`vue@^3.3.0` 为 peer dependency（不会被自动安装，需宿主项目已存在）。
 
-### 使用远程图片
+---
+
+## 快速开始
 
 ```vue
 <template>
-  <div class="demo-container">
-    <PointAnnotation
-      ref="annotationRef"
-      :imageSource="imageSource"
-      :options="options"
-      @pointChange="handlePointChange"
-      @loadSuccess="handleLoadSuccess"
-    />
-    <div class="controls">
-      <button @click="exportJSON">导出 JSON</button>
-      <button @click="exportMask">导出 Mask</button>
-    </div>
-  </div>
+  <PointAnnotation
+    ref="annotationRef"
+    :image-source="imageSource"
+    :options="options"
+    @point-change="handlePointChange"
+    @load-success="handleLoadSuccess"
+  />
 </template>
 
 <script setup lang="ts">
 import { ref, computed } from 'vue'
 import { PointAnnotation } from '@zzalai/leafer-point-annotation'
+
+// 👇 必须手动导入样式
 import '@zzalai/leafer-point-annotation/dist/leafer-point-annotation.css'
 
 const annotationRef = ref<InstanceType<typeof PointAnnotation> | null>(null)
+
+// 方式一：远程图片
 const imageSource = computed(() => ({
-  id: 'demo-image',
-  url: 'https://example.com/image.jpg'
+  url: 'https://example.com/sample.jpg'
 }))
 
-const options = ref({
+// 方式二：不传 imageSource，用户本地上传
+// const imageSource = null
+
+const options = {
+  enableBrush: true,
   pointStyle: {
     circleFill: '#ff4d4f',
-    circleStroke: '#ffffff',
-    labelBackgroundColor: '#ffffff'
+    circleStroke: '#ffffff'
   },
   brushStyle: {
-    color: '#ff4d4f',
+    color: '#1890ff',
     opacity: 0.55,
     size: 100
-  },
-  maskExportFormat: 'png',
-  maskExportForeground: 'black'
-})
-
-const handlePointChange = (points) => {
-  console.log('标注点变化:', points)
-}
-
-const handleLoadSuccess = () => {
-  console.log('图片加载成功')
-}
-
-const exportJSON = () => {
-  const json = annotationRef.value?.exportCanvasJSON()
-  if (json) {
-    const blob = new Blob([json], { type: 'application/json' })
-    const url = URL.createObjectURL(blob)
-    const a = document.createElement('a')
-    a.href = url
-    a.download = 'annotation.json'
-    a.click()
   }
 }
 
-const exportMask = async () => {
-  const mask = await annotationRef.value?.exportMaskImage('png', 'black')
-  if (mask) {
-    const a = document.createElement('a')
-    a.href = mask
-    a.download = 'mask.png'
-    a.click()
-  }
+function handlePointChange(points: any[]) {
+  console.log('点标注变化：', points)
+}
+
+function handleLoadSuccess(info: any) {
+  console.log('图片加载成功：', info)
 }
 </script>
-
-<style scoped>
-.demo-container {
-  width: 100%;
-  height: 600px;
-}
-
-.controls {
-  margin-top: 16px;
-  display: flex;
-  gap: 12px;
-}
-</style>
 ```
 
-### 使用本地图片上传
+---
 
-不提供 `imageSource` prop 时，会显示本地上传界面，支持点击选择或拖拽上传。
+## Props 配置
+
+### imageSource
+
+| 字段 | 类型 | 说明 |
+|------|------|------|
+| `url` | `string` | 图片地址（远程 URL 或 dataURL） |
+| `id` | `string` | 可选，业务标识 |
+
+> 不传 `imageSource` 时，组件显示大面积上传区域，支持**点击选择文件**和**拖拽文件**两种本地加载方式。
+
+### options
+
+完整的 `OptionsSource`：
+
+```ts
+interface OptionsSource {
+  // ============ 功能开关 ============
+  enableBrush?: boolean                     // 是否启用笔刷（默认 true）；
+                                            // false 时笔刷按钮/面板不渲染，
+                                            // brushTool/eraserTool/mask 导出等方法失效
+
+  // ============ UI 开关 ============
+  showToolbar?: boolean                     // 是否显示内置工具栏（默认 true）
+  showZoomController?: boolean              // 是否显示内置缩放控制器（默认 true）
+  canvasBackground?: string                 // 画布背景色（默认 '#f6f6f6'）
+
+  // ============ 缩放 ============
+  zoomMin?: number                          // 最小缩放比例（默认 0.2）
+  zoomMax?: number                          // 最大缩放比例（默认 4）
+
+  // ============ 点标注 ============
+  pointStyle?: Partial<PointStyle>          // 点标注样式（覆盖默认）
+  maxPoints?: number                        // 最大点数（可选）
+
+  // ============ 笔刷 ============
+  brushStyle?: Partial<BrushStyle>          // 笔刷样式（覆盖默认）
+  brushLayers?: BrushLayerConfig[]          // 笔刷图层配置（不传则单图层 "default"）
+  maxBrushLayers?: number                   // 最大图层数（可选）
+
+  // ============ 历史 ============
+  maxUndoSteps?: number                     // 最大撤销步数（默认 100）
+
+  // ============ Mask 导出 ============
+  maskExportFormat?: 'png' | 'jpeg' | 'jpg' // Mask 默认导出格式（默认 png）
+  maskExportForeground?: 'black' | 'white'  // Mask 默认前景色（默认 black）
+}
+```
+
+#### PointStyle（点标注样式）
+
+```ts
+interface PointStyle {
+  circleRadius: number
+  circleFill: string
+  circleStroke: string
+  circleStrokeWidth: number
+
+  // hover
+  hoverCircleFill: string
+  hoverCircleStroke: string
+
+  // selected
+  selectedCircleFill: string
+  selectedCircleStroke: string
+  selectedCircleScale: number
+
+  // 文字
+  circleTextFontSize: number
+  circleTextFontFamily: string
+  circleTextFill: string
+
+  // label
+  labelBackgroundColor: string
+  labelTextColor: string
+  labelFontSize: number
+  labelPadding: number | number[]
+
+  // 固定大小
+  fixedSizeOnZoom?: boolean                 // 开启则点不随画布缩放变大
+  fixedSizeScale?: number                   // 固定大小系数
+}
+```
+
+默认值参考 [`src/types/index.ts`](src/types/index.ts)。
+
+#### BrushStyle（笔刷样式）
+
+```ts
+interface BrushStyle {
+  color: string                             // 笔刷颜色（十六进制）
+  opacity: number                           // 透明度 0~1（通过 Group.opacity 控制）
+  size: number                              // 笔刷大小（像素）
+  minSize: number                           // 滑块最小
+  maxSize: number                           // 滑块最大
+  continuity: number                        // 两点间最大距离阈值（超过则断开）
+}
+```
+
+#### BrushLayerConfig（多图层配置）
+
+```ts
+interface BrushLayerConfig {
+  label: string                             // 图层显示名
+  value: string                             // 图层唯一标识
+  color?: string                            // 该图层默认颜色
+  opacity?: number                          // 该图层默认透明度
+  size?: number                             // 该图层默认笔刷大小
+}
+```
+
+不传 `brushLayers` 时默认为单图层 `{label:'默认图层', value:'default'}`。
+
+### currentLayer（v-model:currentLayer）
+
+受控图层切换。例如：
+
+```vue
+<PointAnnotation
+  :options="{ brushLayers: [
+    { label: '前景', value: 'foreground' },
+    { label: '遮挡', value: 'occlusion' }
+  ]}"
+  v-model:current-layer="activeLayer"
+/>
+```
+
+---
+
+## Events 事件
+
+| 事件 | 参数 | 触发时机 |
+|------|------|---------|
+| `point-change` | `(points: PointAnnotation[])` | 点新增 / 删除 / 修改 / 重排 |
+| `load-start` | - | 开始加载图片 |
+| `load-success` | `{ url, width, height }` | 图片加载成功 |
+| `load-error` | `{ error }` | 图片加载失败 |
+| `undo-state-change` | `{ canUndo }` | 撤销栈状态变化 |
+| `redo-state-change` | `{ canRedo }` | 重做栈状态变化 |
+| `update:currentLayer` | `layerValue` | 当前笔刷图层变化（配合 v-model） |
+| `layer-change` | `layerValue` | 同 update:currentLayer |
+
+---
+
+## Ref API（父组件调用）
+
+通过 `ref` 访问组件实例后可调用以下方法。
+
+```ts
+const annotationRef = ref<InstanceType<typeof PointAnnotation> | null>(null)
+
+// 示例：
+annotationRef.value?.pointTool()                 // 切到点标注工具
+annotationRef.value?.createBrushFromPoints()     // 按点轨迹生成笔刷区域
+annotationRef.value?.getMaskBlob()                // 导出当前图层 Blob（上传后端）
+```
+
+### 点标注
+
+| 方法 | 说明 |
+|------|------|
+| `getPointAnnotations(): PointAnnotation[]` | 获取当前所有点 |
+| `createPointAnnotation(x: number, y: number, label?: string): boolean` | 程序化新增一个点 |
+| `removePointAnnotation(id: string): boolean` | 程序化删除一个点 |
+| `updatePointAnnotationLabel(id: string, label: string): boolean` | 修改某个点的 label |
+
+### 图片 & 画布
+
+| 方法 | 说明 |
+|------|------|
+| `getImageInfo()` | `{ url, width, height }` |
+| `loadImage(url: string)` | 动态加载一张新图片 |
+
+### 工具切换
+
+| 方法 | 说明 |
+|------|------|
+| `getCurrentTool(): 'select' \| 'point' \| 'brush' \| 'eraser'` | - |
+| `setTool(tool)` | 切换到指定工具（`enableBrush=false` 时 brush/eraser 被拦截） |
+| `selectTool()` | 选择工具 |
+| `pointTool()` | 点标注工具 |
+| `brushTool(openPanel?: boolean)` | 笔刷工具 |
+| `eraserTool()` | 橡皮擦工具 |
+
+### 删除 & 清空
+
+| 方法 | 说明 |
+|------|------|
+| `deleteSelected()` | 删除当前选中的点（带 `confirm`） |
+| `clearAllAnnotationsAndBrush()` | 清空所有点 + 笔刷（带 `confirm`） |
+| `clearBrush()` | 清空当前图层的笔刷 |
+| `clearAllBrushLayers()` | 清空所有图层的笔刷 |
+
+### 笔刷图层
+
+| 方法 | 说明 |
+|------|------|
+| `getCurrentLayer(): string` | 当前激活图层 value |
+| `setActiveLayer(value: string): boolean` | 切换到指定图层 |
+| `getAllLayers(): BrushLayerConfig[]` | 所有图层配置 |
+
+### 笔刷样式
+
+| 方法 | 说明 |
+|------|------|
+| `getBrushStyle(): BrushStyle` | 返回当前样式的拷贝 |
+| `updateBrushStyle(partial: Partial<BrushStyle>): void` | 动态更新（如颜色/透明度/大小） |
+
+### 点轨迹生成笔刷区域
+
+| 方法 | 说明 |
+|------|------|
+| `createBrushFromPoints(): boolean` | 按 `sequenceNumber` 顺序将点的像素坐标连成闭合多边形，使用当前笔刷样式填充；点数量 < 3 时不操作 |
+
+### 缩放
+
+| 方法 | 说明 |
+|------|------|
+| `zoomIn()` | 放大 |
+| `zoomOut()` | 缩小 |
+| `resetZoom()` | 重置到 100% |
+
+### 撤销 / 重做
+
+| 方法 | 说明 |
+|------|------|
+| `undo()` | 撤销上一步 |
+| `redo()` | 重做上一步 |
+
+### 导入 / 导出
+
+| 方法 | 说明 |
+|------|------|
+| `exportCanvasJSON(): string` | 全量导出（点 + 笔刷快照 + 图片信息） |
+| `importCanvasJSON(data: string \| object): boolean` | 从导出的 JSON 恢复 |
+| `exportMaskImage(format?, fg?)`: `Promise<string \| null>` | 当前图层 mask（dataURL） |
+| `exportMaskImageByLayer(layerValue, format?, fg?)`: `Promise<string \| null>` | 指定图层 mask |
+| `exportAllMaskImages(format?, fg?)`: `Promise<Record<string, string>>` | 所有图层 mask |
+| `getMaskBlob(layerValue?, format?, fg?)`: `Promise<Blob \| null>` | 当前/指定图层 Blob（后端上传） |
+| `getMaskFile(layerValue?, filename?, format?, fg?)`: `Promise<File \| null>` | 当前/指定图层 File |
+| `getAllMaskBlobs(format?, fg?)`: `Promise<Record<string, Blob>>` | 所有图层 Blob 集合 |
+| `exportCOCO(): string` | 导出 COCO JSON（点标注 = keypoints） |
+| `exportYOLO(): string` | 导出 YOLO 标注 |
+
+> 参数说明：`format` = `'png' \| 'jpeg' \| 'jpg'`；`fg` = `'black' \| 'white'`（mask 前景色）。
+> 注：所有 Mask/Blob/File 相关方法需在浏览器环境调用，且在 `enableBrush=false` 时返回 null/{}。
+
+---
+
+## 使用示例
+
+### 最小示例
 
 ```vue
 <template>
-  <div class="demo-container">
-    <PointAnnotation
-      ref="annotationRef"
-      :options="options"
-      @pointChange="handlePointChange"
-      @loadSuccess="handleLoadSuccess"
-    />
+  <PointAnnotation
+    ref="annotationRef"
+    :image-source="{ url: 'https://example.com/image.jpg' }"
+    :options="{ enableBrush: false }"
+  />
+</template>
+
+<script setup lang="ts">
+import { ref } from 'vue'
+import { PointAnnotation } from '@zzalai/leafer-point-annotation'
+import '@zzalai/leafer-point-annotation/dist/leafer-point-annotation.css'
+
+const annotationRef = ref<InstanceType<typeof PointAnnotation> | null>(null)
+</script>
+```
+
+### 完整自定义（隐藏内置工具栏）
+
+```vue
+<template>
+  <div class="my-toolbar">
+    <button @click="() => annotationRef.value?.pointTool()">点标注</button>
+    <button @click="() => annotationRef.value?.brushTool()">笔刷</button>
+    <button @click="() => annotationRef.value?.eraserTool()">橡皮</button>
+    <button @click="() => annotationRef.value?.deleteSelected()">删除</button>
+    <button @click="() => annotationRef.value?.clearAllAnnotationsAndBrush()">全部清空</button>
+    <button @click="() => annotationRef.value?.undo()">撤销</button>
+    <button @click="() => annotationRef.value?.redo()">重做</button>
+    <button @click="() => annotationRef.value?.createBrushFromPoints()">点→多边形</button>
+    <button @click="uploadMask">上传 Mask</button>
   </div>
+
+  <PointAnnotation
+    ref="annotationRef"
+    :image-source="{ url: 'https://example.com/image.jpg' }"
+    :options="{ showToolbar: false, showZoomController: false }"
+    @point-change="handlePoints"
+  />
 </template>
 
 <script setup lang="ts">
@@ -152,280 +430,177 @@ import '@zzalai/leafer-point-annotation/dist/leafer-point-annotation.css'
 
 const annotationRef = ref<InstanceType<typeof PointAnnotation> | null>(null)
 
-const options = ref({
-  pointStyle: {
-    circleFill: '#ff4d4f',
-    circleStroke: '#ffffff',
-    labelBackgroundColor: '#ffffff'
-  },
-  brushStyle: {
-    color: '#ff4d4f',
-    opacity: 0.55,
-    size: 100
-  }
-})
-
-const handlePointChange = (points) => {
-  console.log('标注点变化:', points)
+function handlePoints(points: any[]) {
+  console.log('points:', points)
 }
 
-const handleLoadSuccess = () => {
-  console.log('图片加载成功')
+async function uploadMask() {
+  const blob = await annotationRef.value?.getMaskBlob()
+  if (!blob) return
+  const fd = new FormData()
+  fd.append('file', blob, 'mask.png')
+  await fetch('/api/upload', { method: 'POST', body: fd })
 }
 </script>
-
-<style scoped>
-.demo-container {
-  width: 100%;
-  height: 600px;
-}
-</style>
 ```
 
-## 多图层笔刷使用
-
-当业务需要区分不同类型的涂抹区域（例如「遮罩区域」与「遮挡区域」）时，可通过 `options.brushLayers` 配置多个图层。
-
-### 基本用法
+### 多图层笔刷
 
 ```vue
 <template>
   <PointAnnotation
     ref="annotationRef"
-    :imageSource="imageSource"
-    :options="options"
-    v-model:currentLayer="activeLayer"
+    :image-source="{ url: 'https://example.com/image.jpg' }"
+    :options="{
+      brushLayers: [
+        { label: '前景', value: 'foreground', color: '#1890ff', opacity: 0.55 },
+        { label: '遮挡', value: 'occlusion',  color: '#faad14', opacity: 0.55 },
+        { label: '背景', value: 'background', color: '#52c41a', opacity: 0.55 }
+      ]
+    }"
+    v-model:current-layer="activeLayer"
   />
 </template>
 
 <script setup lang="ts">
-import { ref, computed } from 'vue'
+import { ref } from 'vue'
 import { PointAnnotation } from '@zzalai/leafer-point-annotation'
 import '@zzalai/leafer-point-annotation/dist/leafer-point-annotation.css'
 
 const annotationRef = ref<InstanceType<typeof PointAnnotation> | null>(null)
-const imageSource = computed(() => ({ url: 'https://example.com/image.jpg' }))
 const activeLayer = ref('foreground')
+</script>
+```
 
-const options = ref({
-  brushStyle: { color: '#ff4d4f', opacity: 0.55, size: 100 },
-  brushLayers: [
-    { label: '前景区域', value: 'foreground' },
-    { label: '背景区域', value: 'background' },
-    { label: '忽略区域', value: 'ignore' }
-  ],
-  maxBrushLayers: 8
-})
+### 后端上传 Mask（Blob/File）
 
-// 导出所有图层的二值图
-const exportAll = async () => {
-  const masks = await annotationRef.value?.exportAllMaskImages()
-  console.log('各图层 mask:', masks)
-  // { foreground: 'data:image/png;base64,...', background: '...', ignore: '...' }
+```vue
+<template>
+  <PointAnnotation ref="annotationRef" :image-source="{ url: '...' }" />
+  <button @click="uploadAllMasks">上传所有图层 Mask</button>
+</template>
+
+<script setup lang="ts">
+import { ref } from 'vue'
+import { PointAnnotation } from '@zzalai/leafer-point-annotation'
+import '@zzalai/leafer-point-annotation/dist/leafer-point-annotation.css'
+
+const annotationRef = ref<InstanceType<typeof PointAnnotation> | null>(null)
+
+async function uploadAllMasks() {
+  const blobs = await annotationRef.value?.getAllMaskBlobs('png', 'black')
+  if (!blobs) return
+  for (const [layerValue, blob] of Object.entries(blobs)) {
+    const fd = new FormData()
+    fd.append('file', blob, `${layerValue}.png`)
+    await fetch('/api/mask-upload', { method: 'POST', body: fd })
+  }
 }
 </script>
 ```
 
-**说明：**
+### 只启用点标注（禁用笔刷）
 
-- 配置 `brushLayers` 后，工具栏会自动出现图层下拉选择器
-- 每个图层独立维护自己的笔刷绘制内容，互不干扰
-- `exportCanvasJSON` 会包含所有图层数据，`importCanvasJSON` 可完整恢复
-- 未配置 `brushLayers` 时，保持单图层模式，与旧版本完全兼容
-- 通过 `v-model:currentLayer` 可让父组件驱动图层切换
+```vue
+<template>
+  <PointAnnotation
+    ref="annotationRef"
+    :image-source="{ url: '...' }"
+    :options="{ enableBrush: false }"
+    @point-change="handlePoints"
+  />
+</template>
 
-## API 文档
+<script setup lang="ts">
+import { ref } from 'vue'
+import { PointAnnotation } from '@zzalai/leafer-point-annotation'
+import '@zzalai/leafer-point-annotation/dist/leafer-point-annotation.css'
 
-### Props
-
-| 属性名 | 类型 | 默认值 | 说明 |
-|--------|------|--------|------|
-| imageSource | `{ id?: string; url: string }` | `null` | 图片源配置（可选，不提供时显示本地上传入口） |
-| options | `Object` | `{}` | 配置选项 |
-| currentLayer | `string` | `undefined` | 当前激活的笔刷图层（支持父组件驱动切换，v-model:currentLayer） |
-
-#### Options 配置
-
-```typescript
-interface Options {
-  pointStyle?: Partial<PointStyle>
-  brushStyle?: Partial<BrushStyle>
-  brushLayers?: BrushLayerConfig[]  // 多图层配置，默认无则使用单图层
-  maxBrushLayers?: number            // 最大图层数上限，默认 8
-  maskExportFormat?: 'png' | 'jpg' | 'jpeg'
-  maskExportForeground?: 'black' | 'white'
-  maxUndoSteps?: number
+const annotationRef = ref<InstanceType<typeof PointAnnotation> | null>(null)
+function handlePoints(points: any[]) {
+  console.log('标注：', points)
 }
-
-interface BrushLayerConfig {
-  label: string    // 下拉选择器显示名称
-  value: string    // 图层唯一标识
-}
+</script>
 ```
 
-#### PointStyle 配置
+---
 
-```typescript
-interface PointStyle {
-  circleRadius: number
-  circleFill: string
-  circleStroke: string
-  circleStrokeWidth: number
-  hoverCircleFill: string
-  hoverCircleStroke: string
-  selectedCircleFill: string
-  selectedCircleStroke: string
-  selectedCircleScale: number
-  labelBackgroundColor: string
-  labelTextColor: string
-  labelFontSize: number
-  labelPadding: number[]
-  fixedSizeOnZoom: boolean
-  fixedSizeScale: number
-}
+## 快捷键
+
+> 生效条件：**画布获得焦点** 或 **鼠标 hover 在画布上**
+
+| 按键 | 功能 | 限制 |
+|------|------|------|
+| `v` | 选择工具 | - |
+| `p` | 点标注工具 | - |
+| `b` | 笔刷工具 | 需 `enableBrush=true` |
+| `e` | 橡皮擦工具 | 需 `enableBrush=true` |
+| `Ctrl + Z` | 撤销 | - |
+| `Ctrl + Y` | 重做 | - |
+| `Delete` | 删除选中的点 | - |
+| `Ctrl + +` | 放大 | - |
+| `Ctrl + -` | 缩小 | - |
+| `Ctrl + 0` | 重置缩放 | - |
+| `Alt` | 显示/隐藏快捷键提示浮层 | - |
+
+---
+
+## 开发与构建
+
+```bash
+# 安装依赖
+pnpm install
+
+# 本地开发（App.vue 为演示入口）
+pnpm dev
+
+# 构建库产物（dist/）
+pnpm build
+
+# 构建演示站点（docs/）
+pnpm docs:build
+
+# 同时构建库 + 演示站
+pnpm build:all
+
+# 类型检查
+pnpm tsc --noEmit
 ```
 
-#### BrushStyle 配置
+### 项目结构
 
-```typescript
-interface BrushStyle {
-  color: string
-  opacity: number
-  size: number
-  minSize: number
-  maxSize: number
-  continuity: number
-}
+```
+src/
+├── components/
+│   ├── PointAnnotation.vue        # 核心主组件（所有能力整合）
+│   ├── BrushSizeSlider.vue        # 笔刷大小滑块
+│   └── BrushStylePanel.vue        # 笔刷样式面板
+├── elements/
+│   └── PointAnnotationElement.ts  # 自定义点元素（Group + Ellipse + Text）
+├── utils/
+│   ├── CanvasBrush.ts             # 笔刷底层（canvas + 绘制快照）
+│   ├── BrushCommands.ts           # 笔刷撤销命令
+│   ├── PointCommands.ts           # 点撤销命令
+│   ├── BrushStroke.ts             # 笔画数据
+│   ├── COCOExporter.ts            # COCO 导出
+│   └── YOLOExporter.ts            # YOLO 导出
+├── types/
+│   └── index.ts                   # 所有对外类型与默认值
+├── App.vue                        # dev 演示页
+├── index.ts                       # 对外导出
+└── main.ts                        # dev 入口
 ```
 
-### Events
+### 发布流程
 
-| 事件名 | 参数 | 说明 |
-|--------|------|------|
-| pointChange | `PointAnnotation[]` | 点标注数据变化时触发 |
-| loadStart | - | 图片开始加载时触发 |
-| loadSuccess | - | 图片加载成功时触发 |
-| loadError | `error` | 图片加载失败时触发 |
-| undoStateChange | - | 撤销状态变化时触发 |
-| redoStateChange | - | 重做状态变化时触发 |
-| update:currentLayer | `string` | 当前图层切换时触发（与 currentLayer prop 配合使用） |
+1. `pnpm install` → `pnpm build:all`
+2. 确认 `dist/` 与 `docs/` 最新
+3. 更新 `package.json` 的 `version`
+4. `npm publish`
+5. `git push` 到 GitHub（触发 Pages 重新部署）
 
-### Methods
-
-组件暴露以下方法：
-
-| 方法名 | 参数 | 返回值 | 说明 |
-|--------|------|--------|------|
-| getPointAnnotations | - | `PointAnnotation[]` | 获取所有点标注数据 |
-| getImageInfo | - | `Object` | 获取图片信息 |
-| exportCanvasJSON | - | `string` | 导出完整 JSON 数据（包含所有图层） |
-| exportMaskImage | `format?`, `fgColor?` | `Promise<string\|null>` | 导出当前激活图层的二值图 |
-| exportMaskImageByLayer | `layerValue`, `format?`, `fgColor?` | `Promise<string\|null>` | 导出指定图层的二值图 |
-| exportAllMaskImages | `format?`, `fgColor?` | `Promise<Record<string,string>>` | 导出所有图层的二值图（key 为图层 value） |
-| exportCOCO | - | `string` | 导出 COCO 格式 JSON |
-| exportYOLO | - | `{ annotations: string; classNames: string }` | 导出 YOLO 格式 |
-| importCanvasJSON | `jsonString`, `options?` | `Promise<boolean>` | 导入 JSON 数据（兼容多图层） |
-| loadImage | `url?` | `Promise<void>` | 加载图片 |
-| clearBrush | - | `void` | 清除当前激活图层的笔刷内容 |
-| clearAllBrushLayers | - | `void` | 清除所有图层的笔刷内容 |
-| getCurrentLayer | - | `string` | 获取当前激活的图层 value |
-| setActiveLayer | `layerValue` | `void` | 切换到指定图层 |
-| getAllLayers | - | `BrushLayerConfig[]` | 获取所有图层配置 |
-| zoomIn | - | `void` | 放大画布 |
-| zoomOut | - | `void` | 缩小画布 |
-| resetZoom | - | `void` | 重置缩放 |
-| undo | - | `void` | 撤销操作 |
-| redo | - | `void` | 重做操作 |
-| getCurrentTool | - | `'select'\|'point'\|'brush'\|'eraser'` | 获取当前工具 |
-| setTool | `tool` | `void` | 设置当前工具 |
-| createPointAnnotation | `x`, `y` | `string\|null` | 创建标注点 |
-| removePointAnnotation | `id` | `boolean` | 删除指定标注点 |
-
-## 热键说明
-
-| 热键 | 功能 |
-|------|------|
-| V | 选择工具 |
-| P | 点标注工具 |
-| B | 笔刷工具 |
-| E | 擦除工具 |
-| Ctrl + Z | 撤销 |
-| Ctrl + Y | 重做 |
-| Delete | 删除选中/清除所有 |
-| Ctrl + + | 放大 |
-| Ctrl + - | 缩小 |
-| Ctrl + 0 | 重置缩放 |
-| Alt | 显示/隐藏热键提示 |
-
-## 导出格式
-
-### JSON Full
-
-包含完整的标注数据和笔刷 mask。
-
-```json
-{
-  "version": "1.0",
-  "imageUrl": "https://example.com/image.jpg",
-  "imageWidth": 1280,
-  "imageHeight": 720,
-  "pointAnnotations": [
-    {
-      "id": "point_xxx",
-      "pixel": { "x": 100, "y": 200 },
-      "normalized": { "x": 0.078, "y": 0.278 },
-      "label": "#1",
-      "createdAt": 1716960000000,
-      "updatedAt": 1716960000000
-    }
-  ],
-  "brushMask": "data:image/png;base64,...",
-  "exportTime": 1716960000000
-}
-```
-
-### COCO
-
-适用于关键点检测任务。
-
-### YOLO
-
-适用于 YOLO 系列模型训练。
-
-### Mask Image
-
-PNG/JPG 格式的二值图，前景为黑色/白色，背景透明/白色。
-
-## 项目文档
-
-- [需求文档](./project-docs/REQUIREMENTS.md) - 详细的功能需求说明
-- [架构文档](./project-docs/ARCHITECTURE.md) - 系统架构设计
-- [实现计划](./project-docs/IMPLEMENTATION_PLAN.md) - 开发任务规划
-- [开发指南](./project-docs/leafer-development-guide/LEAFER_DEVELOPMENT_GUIDE.md) - LeaferJS 开发实战指南
-
-## 浏览器支持
-
-- Chrome 60+
-- Firefox 55+
-- Safari 12+
-- Edge 79+
-
-## 依赖
-
-- Vue 3.3.0+
-- LeaferUI 2.0.8+
-- Tinykeys 3.0.0+
-- @zzalai/leafer-undo-redo 1.0.3+
+---
 
 ## 许可证
 
-MIT License
-
-## 贡献
-
-欢迎提交 Issue 和 Pull Request！
-
-## 相关项目
-
-- [@zzalai/leafer-multi-roi](https://github.com/otaku1951/leafer-multi-roi) - 多区域 ROI 标注工具
-- [@zzalai/leafer-undo-redo](https://github.com/otaku1951/leafer-undo-redo) - LeaferJS 撤销/重做插件
+MIT © zzalai
