@@ -159,6 +159,22 @@
       </div>
 
       <div class="control-group">
+        <h3>Upload Mask as File to Backend API (via ref API)</h3>
+        <p class="subtle">直接拿 File 对象传给后端 form-data 上传接口，无需自己做 dataURL 转换</p>
+        <div class="multi-layer-row">
+          <label>上传接口 URL:</label>
+          <input type="text" v-model="uploadApiUrl" placeholder="https://your-api.com/upload" style="width: 280px;" />
+        </div>
+        <div class="multi-layer-row">
+          <label>上传字段名:</label>
+          <input type="text" v-model="uploadFieldName" placeholder="file" style="width: 120px;" />
+          <button @click="uploadMaskFile">📤 上传当前图层 mask 到后端</button>
+          <button @click="uploadAllMaskFiles">📦 上传所有图层 mask</button>
+        </div>
+        <div v-if="uploadLog" class="upload-log">{{ uploadLog }}</div>
+      </div>
+
+      <div class="control-group">
         <h3>Point Label Editor (via ref API)</h3>
         <p class="subtle">点标注后，父组件通过 updatePointAnnotationLabel(id, label) 修改标注点名称</p>
         <div v-if="pointsData.length === 0" class="subtle">暂无点标注，请在画布上点击添加</div>
@@ -329,6 +345,9 @@ const pointAnnotation = ref<InstanceType<typeof PointAnnotation> | null>(null)
 const pointsData = ref<any[]>([])
 const maskFormat = ref<'png' | 'jpeg'>('png')
 const maskForeground = ref<'black' | 'white'>('black')
+const uploadApiUrl = ref<string>('https://your-api.com/upload')
+const uploadFieldName = ref<string>('file')
+const uploadLog = ref<string>('')
 const currentTool = ref<'select' | 'point' | 'brush' | 'eraser'>('select')
 const currentToolDisplay = ref('select')
 const lastAddedPointId = ref<string | null>(null)
@@ -391,6 +410,58 @@ const generateBrushFromPoints = () => {
   const result = pointAnnotation.value?.createBrushFromPoints()
   if (result === false) {
     alert('请先在画布上添加至少 3 个标注点')
+  }
+}
+
+// 上传当前图层 mask 为 File 到后端接口（demo）
+const uploadMaskFile = async () => {
+  const file = await pointAnnotation.value?.getMaskFile(undefined, 'mask.png')
+  if (!file) {
+    uploadLog.value = '❌ 当前图层没有可导出的 mask，先在画布上画几笔或标注'
+    return
+  }
+  if (!uploadApiUrl.value) {
+    uploadLog.value = '❌ 请先填写上传接口 URL'
+    return
+  }
+  try {
+    const formData = new FormData()
+    formData.append(uploadFieldName.value || 'file', file)
+    uploadLog.value = `⏳ 正在上传 ${file.name} (${(file.size / 1024).toFixed(1)} KB) 到 ${uploadApiUrl.value}...`
+    const res = await fetch(uploadApiUrl.value, { method: 'POST', body: formData })
+    const text = await res.text()
+    uploadLog.value = `✅ 上传完成，状态 ${res.status}，响应: ${text.substring(0, 300)}`
+  } catch (e) {
+    uploadLog.value = `❌ 上传失败: ${e}`
+  }
+}
+
+// 上传所有图层 mask 到后端（demo）
+const uploadAllMaskFiles = async () => {
+  const blobs = await pointAnnotation.value?.getAllMaskBlobs()
+  if (!blobs || Object.keys(blobs).length === 0) {
+    uploadLog.value = '❌ 没有可导出的 mask'
+    return
+  }
+  if (!uploadApiUrl.value) {
+    uploadLog.value = '❌ 请先填写上传接口 URL'
+    return
+  }
+  try {
+    const formData = new FormData()
+    let totalSize = 0
+    for (const [layerValue, blob] of Object.entries(blobs)) {
+      const name = `mask_${layerValue}.png`
+      const file = new File([blob], name, { type: 'image/png' })
+      formData.append(uploadFieldName.value || 'file', file)
+      totalSize += blob.size
+    }
+    uploadLog.value = `⏳ 正在上传 ${Object.keys(blobs).length} 个文件 (共 ${(totalSize / 1024).toFixed(1)} KB) 到 ${uploadApiUrl.value}...`
+    const res = await fetch(uploadApiUrl.value, { method: 'POST', body: formData })
+    const text = await res.text()
+    uploadLog.value = `✅ 上传完成，状态 ${res.status}，响应: ${text.substring(0, 300)}`
+  } catch (e) {
+    uploadLog.value = `❌ 上传失败: ${e}`
   }
 }
 
@@ -859,5 +930,19 @@ pre {
   font-size: 12px;
   color: #aaa;
   min-width: 80px;
+}
+
+.upload-log {
+  margin-top: 10px;
+  padding: 10px 12px;
+  background-color: #f9f9f9;
+  border: 1px solid #eee;
+  border-radius: 4px;
+  font-size: 13px;
+  color: #333;
+  word-break: break-all;
+  white-space: pre-wrap;
+  max-height: 200px;
+  overflow-y: auto;
 }
 </style>

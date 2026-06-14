@@ -711,15 +711,17 @@ const exportCanvasJSON = (): string => {
   return JSON.stringify(exportData, null, 2);
 };
 
-// 辅助函数：导出单个图层的 mask
-const exportSingleLayerMask = (
+// 内部辅助：把笔刷图层渲染为 HTMLCanvas + mime（二值图）
+// 所有导出方法（dataURL / Blob / File）统一复用这个逻辑，避免重复代码
+const buildMaskCanvas = (
   brush: any,
   format?: 'png' | 'jpeg' | 'jpg',
   foregroundColor?: 'black' | 'white'
-): Promise<string | null> => {
+): Promise<{ canvas: HTMLCanvasElement; mime: string } | null> => {
   return new Promise((resolve) => {
     const exportFormat = format || props.options?.maskExportFormat || 'png';
     const fgColor = foregroundColor || props.options?.maskExportForeground || 'black';
+    const mime = exportFormat === 'png' ? 'image/png' : 'image/jpeg';
 
     const maskData = brush.getImageData();
     if (!maskData) {
@@ -759,11 +761,7 @@ const exportSingleLayerMask = (
       }
       ctx.putImageData(imageData, 0, 0);
 
-      if (exportFormat === 'png') {
-        resolve(canvas.toDataURL('image/png'));
-      } else {
-        resolve(canvas.toDataURL('image/jpeg', 0.95));
-      }
+      resolve({ canvas, mime });
     };
 
     htmlImg.onerror = () => {
@@ -772,6 +770,20 @@ const exportSingleLayerMask = (
 
     htmlImg.src = maskData;
   });
+};
+
+// 辅助函数：导出单个图层的 mask（返回 dataURL）
+const exportSingleLayerMask = async (
+  brush: any,
+  format?: 'png' | 'jpeg' | 'jpg',
+  foregroundColor?: 'black' | 'white'
+): Promise<string | null> => {
+  const result = await buildMaskCanvas(brush, format, foregroundColor);
+  if (!result) return null;
+  const { canvas, mime } = result;
+  return mime === 'image/png'
+    ? canvas.toDataURL('image/png')
+    : canvas.toDataURL('image/jpeg', 0.95);
 };
 
 // 导出二值图（Mask）- 当前激活图层
@@ -803,6 +815,79 @@ const exportAllMaskImages = (
       if (mask) {
         result[layerValue] = mask;
       }
+    }
+    resolve(result);
+  });
+};
+
+// canvas.toBlob 的 Promise 版本（避免回调地狱）
+const canvasToBlob = (canvas: HTMLCanvasElement, mime: string): Promise<Blob | null> => {
+  return new Promise((resolve) => {
+    try {
+      canvas.toBlob((blob) => {
+        resolve(blob);
+      }, mime, mime === 'image/jpeg' ? 0.95 : undefined);
+    } catch (_e) {
+      resolve(null);
+    }
+  });
+};
+
+// 获取指定图层 mask 为 Blob（用于传后端接口上传文件）
+// - layerValue 不传 → 当前激活图层
+const getMaskBlob = (
+  layerValue?: string,
+  format?: 'png' | 'jpeg' | 'jpg',
+  foregroundColor?: 'black' | 'white'
+): Promise<Blob | null> => {
+  const brush = layerValue
+    ? canvasBrushesByLayer.value[layerValue]
+    : activeCanvasBrush.value;
+  if (!brush) return Promise.resolve(null);
+  return new Promise(async (resolve) => {
+    const result = await buildMaskCanvas(brush, format, foregroundColor);
+    if (!result) return resolve(null);
+    const blob = await canvasToBlob(result.canvas, result.mime);
+    resolve(blob);
+  });
+};
+
+// 获取指定图层 mask 为 File（用于传后端接口上传）
+const getMaskFile = (
+  layerValue?: string,
+  filename?: string,
+  format?: 'png' | 'jpeg' | 'jpg',
+  foregroundColor?: 'black' | 'white'
+): Promise<File | null> => {
+  return new Promise(async (resolve) => {
+    const blob = await getMaskBlob(layerValue, format, foregroundColor);
+    if (!blob) return resolve(null);
+    const mime = format === 'jpeg' || format === 'jpg' ? 'image/jpeg' : 'image/png';
+    const ext = format === 'jpeg' || format === 'jpg' ? 'jpg' : 'png';
+    const finalName = filename || `mask_${layerValue || 'current'}_${Date.now()}.${ext}`;
+    try {
+      resolve(new File([blob], finalName, { type: mime }));
+    } catch (_e) {
+      const fallback: any = blob as any;
+      fallback.name = finalName;
+      fallback.type = mime;
+      resolve(fallback);
+    }
+  });
+};
+
+// 获取所有图层的 mask Blob
+const getAllMaskBlobs = (
+  format?: 'png' | 'jpeg' | 'jpg',
+  foregroundColor?: 'black' | 'white'
+): Promise<Record<string, Blob>> => {
+  return new Promise(async (resolve) => {
+    const result: Record<string, Blob> = {};
+    for (const [layerValue, brush] of Object.entries(canvasBrushesByLayer.value)) {
+      const canvasResult = await buildMaskCanvas(brush, format, foregroundColor);
+      if (!canvasResult) continue;
+      const blob = await canvasToBlob(canvasResult.canvas, canvasResult.mime);
+      if (blob) result[layerValue] = blob;
     }
     resolve(result);
   });
@@ -1683,6 +1768,9 @@ defineExpose({
   exportMaskImage,
   exportMaskImageByLayer,
   exportAllMaskImages,
+  getMaskBlob,
+  getMaskFile,
+  getAllMaskBlobs,
   exportCOCO,
   exportYOLO,
   importCanvasJSON,
