@@ -189,7 +189,8 @@ export class PointAnnotationElement extends Group {
     
     // 空值或空白，恢复上一次的值（保证 label 永不为空）
     if (!trimmedLabel) {
-      this.label.text = this._lastValidLabel;
+      // this.label.text = this._lastValidLabel;
+      this.label.text = this._defaultLabel;
       return;
     }
 

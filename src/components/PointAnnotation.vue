@@ -1548,6 +1548,18 @@ const getPointAnnotations = (): PointAnnotation[] => {
   return [...pointAnnotations.value];
 };
 
+// 更新指定标注点的 label（父组件通过 id 找到对应元素并更新名称）
+// 支持点标注后，父组件通过此方法改点标注点的名称
+const updatePointAnnotationLabel = (id: string, label: string): boolean => {
+  const element = pointLayer.children.find((el: any) => el.data?.id === id) as PointAnnotationElement;
+  if (!element) return false;
+  if (element.updateLabel) {
+    element.updateLabel(label);
+  }
+  emit("pointChange", [...pointAnnotations.value]);
+  return true;
+};
+
 const undo = () => {
   if (commandManager?.canUndo()) {
     commandManager.undo();
@@ -1668,6 +1680,7 @@ defineExpose({
   getAllLayers,
   createPointAnnotation,
   removePointAnnotation,
+  updatePointAnnotationLabel,
   getBrushStyle: () => ({ ...localBrushStyle.value }),
   updateBrushStyle,
 });

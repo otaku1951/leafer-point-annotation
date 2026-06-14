@@ -158,6 +158,25 @@
         </div>
       </div>
 
+      <div class="control-group">
+        <h3>Point Label Editor (via ref API)</h3>
+        <p class="subtle">点标注后，父组件通过 updatePointAnnotationLabel(id, label) 修改标注点名称</p>
+        <div v-if="pointsData.length === 0" class="subtle">暂无点标注，请在画布上点击添加</div>
+        <div v-else class="point-list">
+          <div v-for="point in pointsData" :key="point.id" class="point-list-row">
+            <span class="point-num">#{{ point.sequenceNumber }}</span>
+            <input 
+              type="text" 
+              class="label-input"
+              :value="point.label || ''" 
+              placeholder="输入自定义名称"
+              @input="(e: any) => updatePointLabel(point.id, (e.target as HTMLInputElement).value)"
+            />
+            <span class="point-id">{{ point.id }}</span>
+          </div>
+        </div>
+      </div>
+
       <div class="control-group" v-if="useMultiLayer">
         <h3>Per-Layer Mask Export</h3>
         <div class="multi-layer-row">
@@ -297,6 +316,8 @@ const editorOptions = computed<OptionsSource>(() => {
 const loadStatus = ref('idle')
 const pointData = ref('')
 const pointAnnotation = ref<InstanceType<typeof PointAnnotation> | null>(null)
+// 点标注列表（用于父组件修改 label 的 demo）
+const pointsData = ref<any[]>([])
 const maskFormat = ref<'png' | 'jpeg'>('png')
 const maskForeground = ref<'black' | 'white'>('black')
 const currentTool = ref<'select' | 'point' | 'brush' | 'eraser'>('select')
@@ -348,6 +369,12 @@ const handleLayerChange = (layer: string) => {
 // 处理点变化
 const handlePointChange = (data: any) => {
   pointData.value = JSON.stringify(data, null, 2)
+  pointsData.value = Array.isArray(data) ? [...data] : []
+}
+
+// 父组件修改某个标注点的 label（demo）
+const updatePointLabel = (id: string, newLabel: string) => {
+  pointAnnotation.value?.updatePointAnnotationLabel(id, newLabel)
 }
 
 // 处理图片加载开始
@@ -770,5 +797,50 @@ pre {
 .active-btn:hover {
   background-color: var(--leafer-point-color-primary, #409eff);
   opacity: 0.9;
+}
+
+/* 点标注列表 - label 编辑 */
+.point-list {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  max-height: 280px;
+  overflow-y: auto;
+}
+
+.point-list-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 6px 8px;
+  background-color: #f9f9f9;
+  border: 1px solid #eee;
+  border-radius: 4px;
+}
+
+.point-num {
+  min-width: 32px;
+  font-weight: bold;
+  color: #007bff;
+  font-size: 14px;
+}
+
+.label-input {
+  flex: 1;
+  padding: 4px 8px;
+  border: 1px solid #ddd;
+  border-radius: 4px;
+  font-size: 14px;
+}
+
+.label-input:focus {
+  outline: none;
+  border-color: #007bff;
+}
+
+.point-id {
+  font-size: 12px;
+  color: #aaa;
+  min-width: 80px;
 }
 </style>
