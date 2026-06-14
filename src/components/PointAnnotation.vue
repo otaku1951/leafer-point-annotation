@@ -544,7 +544,7 @@ const initCanvas = () => {
 
     // 监听画布点击事件，用于创建点标注
     app.on(PointerEvent.TAP, handleCanvasTap);
-    // app.editor.on(EditorEvent.SELECT, handlePointAnnotationSelected);
+    app.editor.on(EditorEvent.SELECT, handlePointAnnotationSelected);
 
     // 笔刷绘制事件
     app.on(PointerEvent.DOWN, handleBrushDown);
@@ -1308,46 +1308,69 @@ const handleCanvasTap = (e: any) => {
 };
 
 // 处理点击【标注点】选中样式
+// const handlePointAnnotationSelected = (e: any) => {
+//   if (currentTool.value === 'brush' || currentTool.value === 'eraser' || !app || !imageBox) return;
+//   // console.log(e)
+//   if (e.value) {
+//     if (Array.isArray(e.value)) {
+//       e.value.forEach((element: { circle: { set: (arg0: { fill: string; stroke: string, selected: boolean; }) => void; }; }) => {
+//         if (!element.circle) return
+//         element.circle.set({
+//           fill: pointStyle.value.selectedCircleFill,
+//           stroke: pointStyle.value.selectedCircleStroke,
+//           selected: true,
+//         })
+//       });
+//     } else {
+//       const _target = e.value.circle || e.value.parent.circle
+//       if (!_target) return
+//       _target.set({
+//         fill: pointStyle.value.selectedCircleFill,
+//         stroke: pointStyle.value.selectedCircleStroke,
+//         selected: true,
+//       })
+//     }
+//   }
+//   if (e.oldValue && (!Array.isArray(e.oldValue) || !e.value)) {
+//     if (Array.isArray(e.oldValue)) {
+//       e.oldValue.forEach((element: { circle: { set: (arg0: { fill: string; stroke: string, selected: boolean; }) => void; }; }) => {
+//         if (!element.circle) return
+//         element.circle.set({
+//           fill: pointStyle.value.circleFill,
+//           stroke: pointStyle.value.circleStroke,
+//           selected: false,
+//         })
+//       });
+//     } else {
+//       const _target = e.oldValue.circle || e.oldValue.parent.circle
+//       if (!_target || (e.oldValue === e.value?.parent)) return
+//       _target.set({
+//         fill: pointStyle.value.circleFill,
+//         stroke: pointStyle.value.circleStroke,
+//         selected: false,
+//       })
+//     }
+//   }
+// }
+
+// 处理点击【标注点】选中样式
 const handlePointAnnotationSelected = (e: any) => {
   if (currentTool.value === 'brush' || currentTool.value === 'eraser' || !app || !imageBox) return;
-  // console.log(e)
-  if (e.value) {
-    if (Array.isArray(e.value)) {
-      e.value.forEach((element: { circle: { set: (arg0: { fill: string; stroke: string; }) => void; }; }) => {
-        if (!element.circle) return
-        element.circle.set({
-          fill: pointStyle.value.selectedCircleFill,
-          stroke: pointStyle.value.selectedCircleStroke
-        })
-      });
-    } else {
-      const _target = e.value.circle || e.value.parent.circle
-      if (!_target) return
-      _target.set({
-        fill: pointStyle.value.selectedCircleFill,
-        stroke: pointStyle.value.selectedCircleStroke
-      })
-    }
-  }
-  if (e.oldValue && (!Array.isArray(e.oldValue) || !e.value)) {
-    if (Array.isArray(e.oldValue)) {
-      e.oldValue.forEach((element: { circle: { set: (arg0: { fill: string; stroke: string; }) => void; }; }) => {
-        if (!element.circle) return
-        element.circle.set({
-          fill: pointStyle.value.circleFill,
-          stroke: pointStyle.value.circleStroke
-        })
-      });
-    } else {
-      const _target = e.oldValue.circle || e.oldValue.parent.circle
-      if (!_target || (e.oldValue === e.value?.parent)) return
-      _target.set({
-        fill: pointStyle.value.circleFill,
-        stroke: pointStyle.value.circleStroke
-      })
-    }
-  }
-}
+
+  // 收集新选中的所有点的 id（可能是单个，也可能是数组）
+  const selectedIds = new Set<string>();
+  const newValues = Array.isArray(e.value) ? e.value : (e.value ? [e.value] : []);
+  newValues.forEach((element: any) => {
+    if (element.data?.id) selectedIds.add(element.data.id);
+  });
+
+  // 遍历所有标注点，逐个设置状态
+  pointLayer.children.forEach((p: any) => {
+    if (p._element_tag !== 'point-annotation') return;
+    const isSelected = selectedIds.has(p.data?.id);
+    p.handlePointAnnotationSelected?.(isSelected);
+  });
+};
 
 // 创建点标注
 const createPointAnnotation = (pixelX: number, pixelY: number): string | null => {

@@ -11,8 +11,9 @@ export class PointAnnotationElement extends Group {
   public label: Text;
   public data: PointAnnotation;
   private style: PointStyle;
-  public _element_tag: string
+  public _element_tag: string;
   private _lastValidLabel: string;
+  private _isSelected: boolean;
 
   constructor(data: PointAnnotation, style?: Partial<PointStyle>) {
     super();
@@ -20,6 +21,7 @@ export class PointAnnotationElement extends Group {
     this.data = data;
     this.style = { ...DEFAULT_POINT_STYLE, ...style };
     this._lastValidLabel = data.label;
+    this._isSelected = false;
 
     // 创建圆点文本
     this.circleText = new Text({
@@ -45,8 +47,6 @@ export class PointAnnotationElement extends Group {
       // }
     });
 
-
-
     // 创建圆点 - Ellipse 的 x, y 是圆心位置，around 设置为 center
     this.circle = new Ellipse({
       x: 0,
@@ -59,9 +59,13 @@ export class PointAnnotationElement extends Group {
       draggable: false,
       editable: false,
       around: 'center',
-      hoverStyle: {
-        fill: this.style.hoverCircleFill ? this.style.hoverCircleFill : this.style.circleFill
-      },
+      // transition: {
+      //   duration: 200,
+      //   easing: 'bounce-out',
+      // },
+      // hoverStyle: {
+      //   fill: this.style.hoverCircleFill ? this.style.hoverCircleFill : this.style.circleFill
+      // },
     });
 
     // 创建标签 - around 设置为 bottom-left，显示在圆点右上角
@@ -102,7 +106,7 @@ export class PointAnnotationElement extends Group {
     this.y = data.pixel.y;
     this.draggable = true;
     this.editable = true;
-    this.hitChildren = true;
+    this.hitChildren = false;
     // this.hitChildren = true;
     this.editConfig = {
       strokeWidth: 0, // 需要置0，否则有边难看
@@ -123,11 +127,12 @@ export class PointAnnotationElement extends Group {
       // this.label.editable = true;
     })
     this.on(PointerEvent.LEAVE, () => {
+      if (this._isSelected) return
       this.circle.set({
         fill: this.style.circleFill,
         stroke: this.style.circleStroke,
       })
-      // this.label.editable = false;
+      // this.label.editable = true;
     })
     // Hover 效果已通过 hoverStyle 配置，无需监听事件
     // this.circle.on('pointerenter', () => this.updateHover(true));
@@ -150,12 +155,15 @@ export class PointAnnotationElement extends Group {
   public handlePointAnnotationSelected(isSelected: boolean): void {
     const targetStyle = isSelected ? this.style.selectedCircleFill : this.style.circleFill;
     const targetStroke = isSelected ? this.style.selectedCircleStroke : this.style.circleStroke;
-    const targetScale = isSelected ? this.style.selectedCircleScale : 1;
+    // const targetScale = isSelected ? this.style.selectedCircleScale : 1;
+
+    
+    this._isSelected = isSelected;
     
     this.circle.set({
       fill: targetStyle,
       stroke: targetStroke,
-      scale: targetScale,
+      // scale: targetScale,
     });
   }
 
