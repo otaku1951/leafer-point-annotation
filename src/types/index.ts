@@ -11,7 +11,7 @@ export interface PointAnnotation {
     x: number;
     y: number;
   };
-  label: string;
+  label?: string;
   createdAt: number;
   updatedAt: number;
 }

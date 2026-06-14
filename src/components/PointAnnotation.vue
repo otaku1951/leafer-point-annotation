@@ -1272,13 +1272,13 @@ const handleBrushUp = () => {
 };
 
 // 生成 UUID
-const generateUUID = (): string => {
-  return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function(c) {
-    const r = Math.random() * 16 | 0;
-    const v = c === 'x' ? r : (r & 0x3 | 0x8);
-    return v.toString(16);
-  });
-};
+// const generateUUID = (): string => {
+//   return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function(c) {
+//     const r = Math.random() * 16 | 0;
+//     const v = c === 'x' ? r : (r & 0x3 | 0x8);
+//     return v.toString(16);
+//   });
+// };
 
 // 处理画布点击事件
 const handleCanvasTap = (e: any) => {
@@ -1378,7 +1378,7 @@ const createPointAnnotation = (pixelX: number, pixelY: number): string | null =>
 
   // const id = `point_${generateUUID()}`;
   const id = `point_${pointCounter.value}`
-  const label = `#${pointCounter.value}`;
+  // const label = `#${pointCounter.value}`;
   const order = pointCounter.value;
   const sequenceNumber = pointAnnotations.value.length + 1;
 
@@ -1392,7 +1392,7 @@ const createPointAnnotation = (pixelX: number, pixelY: number): string | null =>
     sequenceNumber,
     pixel: { x: pixelX, y: pixelY },
     normalized: { x: normalizedX, y: normalizedY },
-    label,
+    // label,
     createdAt: Date.now(),
     updatedAt: Date.now(),
   };
@@ -1401,6 +1401,11 @@ const createPointAnnotation = (pixelX: number, pixelY: number): string | null =>
   const pointElement = new PointAnnotationElement(pointData, pointStyle.value);
 
   // 根据当前工具设置标签的可编辑状态
+  // 注意：由于 PointAnnotationElement.hitChildren = false，子元素无法接收鼠标事件，
+  //       这里设置 label.editable 实际**不会产生视觉效果**（label 永远收不到双击/点击进入编辑）。
+  //       保留这段逻辑是为了：
+  //       1) 状态上保持一致性（工具切换时设置正确的可编辑状态）
+  //       2) 如果未来把 hitChildren 改回 true，这个设置立即生效
   if (currentTool.value === 'brush' || currentTool.value === 'eraser') {
     pointElement.label.editable = false;
   }
