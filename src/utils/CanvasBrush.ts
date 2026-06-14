@@ -176,4 +176,24 @@ export class CanvasBrush {
     }
     return false;
   }
+
+  // 根据点集合绘制闭合多边形并填充
+  // 用于把标注点的轨迹一键生成笔刷区域
+  public fillPolygon(points: { x: number; y: number }[], color: string): void {
+    if (points.length < 3) return;
+    const { context } = this.canvas;
+    context.save();
+    context.fillStyle = color;
+    context.globalAlpha = 1;
+    context.beginPath();
+    context.moveTo(points[0].x, points[0].y);
+    for (let i = 1; i < points.length; i++) {
+      context.lineTo(points[i].x, points[i].y);
+    }
+    context.closePath();
+    context.fill();
+    context.restore();
+    this.canvas.paint();
+    this.group.set({ dirty: true });
+  }
 }

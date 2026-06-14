@@ -1560,6 +1560,33 @@ const updatePointAnnotationLabel = (id: string, label: string): boolean => {
   return true;
 };
 
+// 根据所有标注点的轨迹，在当前笔刷层中生成闭合多边形填充区域
+// - 点 < 3 不操作（无法形成多边形）
+// - 自动按 sequenceNumber 排序
+// - 使用当前笔刷的 color、opacity
+// - 支持撤销/重做
+const createBrushFromPoints = (): boolean => {
+  const brush = activeCanvasBrush.value;
+  if (!brush) return false;
+  const points = [...pointAnnotations.value];
+  if (points.length < 3) return false;
+  points.sort((a, b) => a.sequenceNumber - b.sequenceNumber);
+  const pixelPoints = points.map(p => ({ x: p.pixel.x, y: p.pixel.y }));
+
+  // 操作前保存快照（BrushSnapshotCommand 会在第一次 execute 时自动保存操作后快照）
+  const beforeSnapshot = brush.getImageData();
+
+  // 执行填充多边形（color 就是笔刷的颜色；opacity 由外层 Group 控制，canvas 上设为 1）
+  brush.fillPolygon(pixelPoints, localBrushStyle.value.color);
+
+  // 包装为撤销命令（第一次 execute 时 BrushSnapshotCommand 会自动保存操作后快照）
+  if (commandManager) {
+    const snapshotCommand = new BrushSnapshotCommand(brush, beforeSnapshot);
+    commandManager.executeCommand(snapshotCommand);
+  }
+  return true;
+};
+
 const undo = () => {
   if (commandManager?.canUndo()) {
     commandManager.undo();
@@ -1681,6 +1708,7 @@ defineExpose({
   createPointAnnotation,
   removePointAnnotation,
   updatePointAnnotationLabel,
+  createBrushFromPoints,
   getBrushStyle: () => ({ ...localBrushStyle.value }),
   updateBrushStyle,
 });

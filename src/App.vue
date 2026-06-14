@@ -177,6 +177,15 @@
         </div>
       </div>
 
+      <div class="control-group">
+        <h3>Generate Brush From Points (via ref API)</h3>
+        <p class="subtle">根据标注点轨迹生成闭合多边形填充区域（需 ≥3 个点），使用当前笔刷颜色和透明度</p>
+        <div class="multi-layer-row">
+          <button @click="generateBrushFromPoints">🎨 一键生成笔刷区域</button>
+          <button @click="pointAnnotation?.clearBrush()">🧹 清除当前笔刷层</button>
+        </div>
+      </div>
+
       <div class="control-group" v-if="useMultiLayer">
         <h3>Per-Layer Mask Export</h3>
         <div class="multi-layer-row">
@@ -375,6 +384,14 @@ const handlePointChange = (data: any) => {
 // 父组件修改某个标注点的 label（demo）
 const updatePointLabel = (id: string, newLabel: string) => {
   pointAnnotation.value?.updatePointAnnotationLabel(id, newLabel)
+}
+
+// 一键根据标注点生成笔刷区域（demo）
+const generateBrushFromPoints = () => {
+  const result = pointAnnotation.value?.createBrushFromPoints()
+  if (result === false) {
+    alert('请先在画布上添加至少 3 个标注点')
+  }
 }
 
 // 处理图片加载开始
