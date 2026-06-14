@@ -72,6 +72,7 @@
         <div class="multi-layer-row">
           <label><input type="checkbox" v-model="showToolbar" /> 显示组件工具栏</label>
           <label><input type="checkbox" v-model="showZoomController" /> 显示缩放控制器</label>
+          <label><input type="checkbox" v-model="enableBrush" /> 启用笔刷功能</label>
         </div>
         <div class="multi-layer-row">
           <label>背景色: <input type="color" v-model="canvasBackground" style="width: 40px; height: 28px; vertical-align: middle; margin-left: 6px;" /></label>
@@ -313,6 +314,7 @@ const showZoomController = ref(true)
 const canvasBackground = ref('#f6f6f6')
 const zoomMin = ref(0.2)
 const zoomMax = ref(4)
+const enableBrush = ref(true)
 
 const editorOptions = computed<OptionsSource>(() => {
   if (useMultiLayer.value) {
@@ -324,7 +326,8 @@ const editorOptions = computed<OptionsSource>(() => {
       showZoomController: showZoomController.value,
       canvasBackground: canvasBackground.value,
       zoomMin: zoomMin.value,
-      zoomMax: zoomMax.value
+      zoomMax: zoomMax.value,
+      enableBrush: enableBrush.value
     }
   }
   return {
@@ -333,7 +336,8 @@ const editorOptions = computed<OptionsSource>(() => {
     showZoomController: showZoomController.value,
     canvasBackground: canvasBackground.value,
     zoomMin: zoomMin.value,
-    zoomMax: zoomMax.value
+    zoomMax: zoomMax.value,
+    enableBrush: enableBrush.value
   }
 })
 

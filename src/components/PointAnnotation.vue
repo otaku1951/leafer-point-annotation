@@ -156,50 +156,52 @@
         </svg>
         <span class="hotkey-hint" v-if="showHotkeys">P</span>
       </button>
-      <button
-        class="tool-button"
-        :class="{ active: currentTool === 'brush' }"
-        title="笔刷工具 (B)"
-        @click="brushTool()"
-        ref="brushButtonRef"
-      >
-        <svg
-          xmlns="http://www.w3.org/2000/svg"
-          width="20"
-          height="20"
-          viewBox="0 0 24 24"
-          fill="none"
-          stroke="currentColor"
-          stroke-width="2"
-          stroke-linecap="round"
-          stroke-linejoin="round"
+      <template v-if="effectiveEnableBrush">
+        <button
+          class="tool-button"
+          :class="{ active: currentTool === 'brush' }"
+          title="笔刷工具 (B)"
+          @click="brushTool()"
+          ref="brushButtonRef"
         >
-          <path d="M9.06 11.9l8.07-8.06a2.85 2.85 0 1 1 4.03 4.03l-8.06 8.08"></path>
-          <path d="M7.07 14.94c-1.66 0-3 1.35-3 3.02 0 1.33-2.5 1.52-2 2.02 1.08 1.1 2.49 2.02 4 2.02 2.2 0 4-1.8 4-4.04a3.01 3.01 0 0 0-3-3.02z"></path>
-        </svg>
-        <span class="hotkey-hint" v-if="showHotkeys">B</span>
-      </button>
-      <button
-        class="tool-button"
-        :class="{ active: currentTool === 'eraser' }"
-        title="橡皮擦工具 (E)"
-        @click="eraserTool"
-      >
-        <svg
-          xmlns="http://www.w3.org/2000/svg"
-          width="20"
-          height="20"
-          viewBox="0 0 24 24"
-          fill="none"
-          stroke="currentColor"
-          stroke-width="2"
-          stroke-linecap="round"
-          stroke-linejoin="round"
+          <svg
+            xmlns="http://www.w3.org/2000/svg"
+            width="20"
+            height="20"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="2"
+            stroke-linecap="round"
+            stroke-linejoin="round"
+          >
+            <path d="M9.06 11.9l8.07-8.06a2.85 2.85 0 1 1 4.03 4.03l-8.06 8.08"></path>
+            <path d="M7.07 14.94c-1.66 0-3 1.35-3 3.02 0 1.33-2.5 1.52-2 2.02 1.08 1.1 2.49 2.02 4 2.02 2.2 0 4-1.8 4-4.04a3.01 3.01 0 0 0-3-3.02z"></path>
+          </svg>
+          <span class="hotkey-hint" v-if="showHotkeys">B</span>
+        </button>
+        <button
+          class="tool-button"
+          :class="{ active: currentTool === 'eraser' }"
+          title="橡皮擦工具 (E)"
+          @click="eraserTool"
         >
-          <path d="M20 20H7L3 16C2.4 15.4 2.4 14.4 3 13.8L13.8 3C14.4 2.4 15.4 2.4 16 3L21 8C21.6 8.6 21.6 9.6 21 10.2L10.2 21C9.6 21.6 8.6 21.6 8 21L3 16"></path>
-        </svg>
-        <span class="hotkey-hint" v-if="showHotkeys">E</span>
-      </button>
+          <svg
+            xmlns="http://www.w3.org/2000/svg"
+            width="20"
+            height="20"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="2"
+            stroke-linecap="round"
+            stroke-linejoin="round"
+          >
+            <path d="M20 20H7L3 16C2.4 15.4 2.4 14.4 3 13.8L13.8 3C14.4 2.4 15.4 2.4 16 3L21 8C21.6 8.6 21.6 9.6 21 10.2L10.2 21C9.6 21.6 8.6 21.6 8 21L3 16"></path>
+          </svg>
+          <span class="hotkey-hint" v-if="showHotkeys">E</span>
+        </button>
+      </template>
       <button class="tool-button" title="撤销 (Ctrl+Z)" @click="undo">
         <svg
           xmlns="http://www.w3.org/2000/svg"
@@ -255,8 +257,9 @@
     </div>
   </div>
   
-  <!-- 笔刷样式配置面板 -->
+  <!-- 笔刷样式配置面板（仅在 enableBrush=true 时渲染） -->
   <BrushStylePanel
+    v-if="effectiveEnableBrush"
     :visible="showBrushPanel"
     :brush-style="localBrushStyle"
     :button-rect="brushButtonRect"
@@ -315,6 +318,7 @@ export interface OptionsSource {
   canvasBackground?: string;
   zoomMin?: number;
   zoomMax?: number;
+  enableBrush?: boolean;
 }
 
 const props = defineProps({
@@ -378,6 +382,7 @@ const pointCounter = ref(1);
 const hasImage = computed(() => loadStatus.value === 'success');
 const showToolbar = computed(() => hasImage.value && (props.options?.showToolbar !== false));
 const showZoomController = computed(() => hasImage.value && (props.options?.showZoomController !== false));
+const effectiveEnableBrush = computed(() => props.options?.enableBrush !== false);
 
 // 点标注样式配置
 const pointStyle = computed<PointStyle>(() => ({
@@ -479,6 +484,26 @@ const activeCanvasBrush = computed<CanvasBrush | null>(() => {
   return canvasBrushesByLayer.value[effectiveCurrentLayer.value] || null;
 });
 
+// 监听 enableBrush 变化（运行时切换笔刷开关）
+// - 关闭：清除所有笔刷 canvas 并重置 tool
+// - 开启：重新初始化笔刷图层
+watch(
+  () => effectiveEnableBrush.value,
+  (newVal) => {
+    // 关闭笔刷 → 清理画布 + 重置 tool 状态
+    if (!newVal) {
+      if (currentTool.value === 'brush' || currentTool.value === 'eraser') {
+        currentTool.value = 'select';
+      }
+      showBrushPanel.value = false;
+    }
+    // 开启笔刷（且已有画布）→ 重新初始化笔刷图层
+    if (newVal && imageWidth.value && imageHeight.value && app) {
+      initBrushLayers();
+    }
+  }
+);
+
 // 监听图层配置变化（支持运行时从单图层切到多图层，或切换图层配置）
 watch(
   () => {
@@ -486,6 +511,7 @@ watch(
     return layers ? layers.map(l => l.value).sort().join(',') : '';
   },
   () => {
+    if (!effectiveEnableBrush.value) return;
     if (imageWidth.value && imageHeight.value && app) {
       initBrushLayers();
     }
@@ -786,28 +812,31 @@ const exportSingleLayerMask = async (
     : canvas.toDataURL('image/jpeg', 0.95);
 };
 
-// 导出二值图（Mask）- 当前激活图层
+// 导出二值图（Mask）- 当前激活图层（笔刷禁用时返回 null）
 const exportMaskImage = (format?: 'png' | 'jpeg' | 'jpg', foregroundColor?: 'black' | 'white'): Promise<string | null> => {
+  if (!effectiveEnableBrush.value) return Promise.resolve(null);
   if (!activeCanvasBrush.value) return Promise.resolve(null);
   return exportSingleLayerMask(activeCanvasBrush.value, format, foregroundColor);
 };
 
-// 导出指定图层的 mask
+// 导出指定图层的 mask（笔刷禁用时返回 null）
 const exportMaskImageByLayer = (
   layerValue: string,
   format?: 'png' | 'jpeg' | 'jpg',
   foregroundColor?: 'black' | 'white'
 ): Promise<string | null> => {
+  if (!effectiveEnableBrush.value) return Promise.resolve(null);
   const brush = canvasBrushesByLayer.value[layerValue];
   if (!brush) return Promise.resolve(null);
   return exportSingleLayerMask(brush, format, foregroundColor);
 };
 
-// 导出所有图层的 masks
+// 导出所有图层的 masks（笔刷禁用时返回空对象）
 const exportAllMaskImages = (
   format?: 'png' | 'jpeg' | 'jpg',
   foregroundColor?: 'black' | 'white'
 ): Promise<Record<string, string>> => {
+  if (!effectiveEnableBrush.value) return Promise.resolve({});
   return new Promise(async (resolve) => {
     const result: Record<string, string> = {};
     for (const [layerValue, brush] of Object.entries(canvasBrushesByLayer.value)) {
@@ -835,11 +864,13 @@ const canvasToBlob = (canvas: HTMLCanvasElement, mime: string): Promise<Blob | n
 
 // 获取指定图层 mask 为 Blob（用于传后端接口上传文件）
 // - layerValue 不传 → 当前激活图层
+// - 笔刷禁用时返回 null
 const getMaskBlob = (
   layerValue?: string,
   format?: 'png' | 'jpeg' | 'jpg',
   foregroundColor?: 'black' | 'white'
 ): Promise<Blob | null> => {
+  if (!effectiveEnableBrush.value) return Promise.resolve(null);
   const brush = layerValue
     ? canvasBrushesByLayer.value[layerValue]
     : activeCanvasBrush.value;
@@ -853,12 +884,14 @@ const getMaskBlob = (
 };
 
 // 获取指定图层 mask 为 File（用于传后端接口上传）
+// - 笔刷禁用时返回 null
 const getMaskFile = (
   layerValue?: string,
   filename?: string,
   format?: 'png' | 'jpeg' | 'jpg',
   foregroundColor?: 'black' | 'white'
 ): Promise<File | null> => {
+  if (!effectiveEnableBrush.value) return Promise.resolve(null);
   return new Promise(async (resolve) => {
     const blob = await getMaskBlob(layerValue, format, foregroundColor);
     if (!blob) return resolve(null);
@@ -876,11 +909,12 @@ const getMaskFile = (
   });
 };
 
-// 获取所有图层的 mask Blob
+// 获取所有图层的 mask Blob（笔刷禁用时返回空对象）
 const getAllMaskBlobs = (
   format?: 'png' | 'jpeg' | 'jpg',
   foregroundColor?: 'black' | 'white'
 ): Promise<Record<string, Blob>> => {
+  if (!effectiveEnableBrush.value) return Promise.resolve({});
   return new Promise(async (resolve) => {
     const result: Record<string, Blob> = {};
     for (const [layerValue, brush] of Object.entries(canvasBrushesByLayer.value)) {
@@ -1003,11 +1037,13 @@ onMounted(() => {
         pointTool();
       },
       b: (event: KeyboardEvent) => {
+        if (!effectiveEnableBrush.value) return;
         if (!isCanvasFocused.value && !isMouseOverCanvas.value) return;
         event.preventDefault();
         brushTool();
       },
       e: (event: KeyboardEvent) => {
+        if (!effectiveEnableBrush.value) return;
         if (!isCanvasFocused.value && !isMouseOverCanvas.value) return;
         event.preventDefault();
         eraserTool();
@@ -1172,6 +1208,7 @@ const pointTool = () => {
 };
 
 const brushTool = (openPanel?: boolean) => {
+  if (!effectiveEnableBrush.value) return;
   currentTool.value = "brush";
   if (!app) return;
   app.editor.config.moveable = false;
@@ -1197,10 +1234,12 @@ const closeBrushPanel = () => {
 };
 
 const updateBrushStyle = (style: Partial<BrushStyle>) => {
+  if (!effectiveEnableBrush.value) return;
   Object.assign(localBrushStyle.value, style);
 };
 
 const eraserTool = () => {
+  if (!effectiveEnableBrush.value) return;
   currentTool.value = "eraser";
   showBrushPanel.value = false;
   if (!app) return;
@@ -1214,6 +1253,7 @@ const eraserTool = () => {
 };
 
 // 初始化所有笔刷图层（在图片加载后调用）
+// 当 enableBrush=false 时，仅做清理工作，不创建任何笔刷 canvas
 const initBrushLayers = () => {
   if (!imageWidth.value || !imageHeight.value || !app) return;
 
@@ -1222,6 +1262,11 @@ const initBrushLayers = () => {
     brush.getGroup().remove();
   });
   canvasBrushesByLayer.value = {};
+
+  // 禁用笔刷 → 不创建任何图层
+  if (!effectiveEnableBrush.value) {
+    return;
+  }
 
   // 为每个图层创建独立的 CanvasBrush 实例
   effectiveBrushLayers.value.forEach((layerConfig) => {
@@ -1522,7 +1567,7 @@ const createPointAnnotation = (pixelX: number, pixelY: number): string | null =>
 
 // 删除选中的点标注或清除笔刷内容
 const deleteSelected = () => {
-  // 如果当前工具是笔刷，清除所有笔刷内容
+  // 如果当前工具是笔刷，清除所有笔刷内容（笔刷禁用时不会走到这里）
   if (currentTool.value === 'brush' || currentTool.value === 'eraser') {
     clearBrush();
     return;
@@ -1531,9 +1576,16 @@ const deleteSelected = () => {
   // select 模式下未选中任何元素，清除所有
   if (currentTool.value === 'select') {
     const selected = app?.editor?.list || [];
-    const hasBrushContent = Object.values(canvasBrushesByLayer.value).some(brush => brush?.hasContent?.());
+    // 禁用笔刷时只关心点标注
+    let hasBrushContent = false;
+    if (effectiveEnableBrush.value) {
+      hasBrushContent = Object.values(canvasBrushesByLayer.value).some(brush => brush?.hasContent?.());
+    }
     if (selected.length === 0 && (pointAnnotations.value.length > 0 || hasBrushContent)) {
-      if (confirm('确定清除所有标注和笔刷绘制区域吗？')) {
+      const confirmMsg = effectiveEnableBrush.value
+        ? '确定清除所有标注和笔刷绘制区域吗？'
+        : '确定清除所有标注吗？';
+      if (confirm(confirmMsg)) {
         clearAllAnnotationsAndBrush();
       }
       return;
@@ -1585,14 +1637,17 @@ const clearAllAnnotationsAndBrush = () => {
   });
   pointAnnotations.value = [];
 
-  // 清除所有图层的笔刷
-  Object.values(canvasBrushesByLayer.value).forEach(brush => brush.clear());
+  // 清除所有图层的笔刷（仅当启用笔刷时）
+  if (effectiveEnableBrush.value) {
+    Object.values(canvasBrushesByLayer.value).forEach(brush => brush.clear());
+  }
 
   emit("pointChange", []);
 };
 
-// 清除当前图层的笔刷内容
+// 清除当前图层的笔刷内容（仅当启用笔刷时）
 const clearBrush = () => {
+  if (!effectiveEnableBrush.value) return;
   if (activeCanvasBrush.value) {
     if (commandManager) {
       const beforeSnapshot = activeCanvasBrush.value.getImageData();
@@ -1605,8 +1660,9 @@ const clearBrush = () => {
   }
 };
 
-// 清除所有图层的笔刷内容
+// 清除所有图层的笔刷内容（仅当启用笔刷时）
 const clearAllBrushLayers = () => {
+  if (!effectiveEnableBrush.value) return;
   Object.entries(canvasBrushesByLayer.value).forEach(([_layerValue, brush]) => {
     if (commandManager) {
       const beforeSnapshot = brush.getImageData();
@@ -1650,7 +1706,9 @@ const updatePointAnnotationLabel = (id: string, label: string): boolean => {
 // - 自动按 sequenceNumber 排序
 // - 使用当前笔刷的 color、opacity
 // - 支持撤销/重做
+// - 笔刷禁用时返回 false
 const createBrushFromPoints = (): boolean => {
+  if (!effectiveEnableBrush.value) return false;
   const brush = activeCanvasBrush.value;
   if (!brush) return false;
   const points = [...pointAnnotations.value];
@@ -1693,6 +1751,10 @@ const getCurrentTool = (): "select" | "point" | "brush" | "eraser" => {
 };
 
 const setTool = (tool: "select" | "point" | "brush" | "eraser") => {
+  // 笔刷禁用时，不允许切到 brush/eraser
+  if (!effectiveEnableBrush.value && (tool === 'brush' || tool === 'eraser')) {
+    return;
+  }
   currentTool.value = tool;
 };
 
