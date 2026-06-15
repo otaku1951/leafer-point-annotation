@@ -524,6 +524,9 @@ const isDrawing = ref(false);
 // 撤销/重做管理器
 let commandManager: CommandManager | null = null;
 
+// 🔧 多实例支持：tinykeys 解绑函数（保存在组件作用域，避免多个实例互相覆盖 window.__pointAnnotationHotkeysUnsubscribe）
+let hotkeysUnsubscribe: (() => void) | null = null;
+
 // 根据配置强制【标注点】不跟随画布Scale变化
 const changePointScaleRelativeCanvas = (pointAnnotationLayer: Group | null) => {
   // 检查是否开启固定大小功能
@@ -1091,7 +1094,8 @@ onMounted(() => {
       },
     });
 
-    window.__pointAnnotationHotkeysUnsubscribe = unsubscribe;
+    // 🔧 多实例支持：unsubscribe 保存在当前组件作用域，不再使用全局 window 存储
+    hotkeysUnsubscribe = unsubscribe;
   });
 });
 
@@ -1179,9 +1183,10 @@ onUnmounted(() => {
   window.removeEventListener("mousemove", handleMouseMove);
   window.removeEventListener('focusout', handleFocusOut);
 
-  if (window.__pointAnnotationHotkeysUnsubscribe) {
-    window.__pointAnnotationHotkeysUnsubscribe();
-    delete window.__pointAnnotationHotkeysUnsubscribe;
+  // 🔧 多实例支持：调用当前实例自己的 unsubscribe，不再使用全局 window
+  if (hotkeysUnsubscribe) {
+    hotkeysUnsubscribe();
+    hotkeysUnsubscribe = null;
   }
 });
 

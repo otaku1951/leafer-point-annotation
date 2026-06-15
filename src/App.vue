@@ -2,7 +2,7 @@
   <div class="app">
     <h1>LeaferJS Point Annotation Test</h1>
     
-    <div class="editor-container">
+    <div class="editor-container" :class="{ 'multi-instance': enableMultiInstance }">
       <PointAnnotation 
         ref="pointAnnotation"
         :imageSource="imageSource" 
@@ -13,6 +13,13 @@
         @loadSuccess="handleLoadSuccess"
         @loadError="handleLoadError"
         @update:currentLayer="handleLayerChange"
+      />
+      <PointAnnotation 
+        v-if="enableMultiInstance"
+        ref="pointAnnotation2"
+        :imageSource="imageSource2" 
+        :options="editorOptions2"
+        @pointChange="handlePointChange2"
       />
     </div>
     
@@ -73,6 +80,7 @@
           <label><input type="checkbox" v-model="showToolbar" /> 显示组件工具栏</label>
           <label><input type="checkbox" v-model="showZoomController" /> 显示缩放控制器</label>
           <label><input type="checkbox" v-model="enableBrush" /> 启用笔刷功能</label>
+          <label><input type="checkbox" v-model="enableMultiInstance" /> 双实例测试（验证多实例快捷键不冲突）</label>
         </div>
         <div class="multi-layer-row">
           <label>背景色: <input type="color" v-model="canvasBackground" style="width: 40px; height: 28px; vertical-align: middle; margin-left: 6px;" /></label>
@@ -315,6 +323,35 @@ const canvasBackground = ref('#f6f6f6')
 const zoomMin = ref(0.2)
 const zoomMax = ref(4)
 const enableBrush = ref(true)
+const enableMultiInstance = ref(false)
+
+const imageSource2 = computed(() => {
+  if (!imageUrl.value) return undefined
+  return { id: 'test-image-2', url: imageUrl.value }
+})
+
+const editorOptions2 = computed<OptionsSource>(() => {
+  return {
+    pointStyle: {
+      circleFill: '#00ff00',
+      circleStroke: '#fff',
+      selectedCircleFill: '#ff0',
+      selectedCircleStroke: '#000'
+    },
+    brushStyle: {
+      color: '#00ff00',
+      opacity: 0.55,
+      size: 100
+    },
+    showToolbar: true,
+    showZoomController: true,
+    enableBrush: enableBrush.value
+  }
+})
+
+const handlePointChange2 = (points: any[]) => {
+  console.log('Editor 2 - Points changed:', points)
+}
 
 const editorOptions = computed<OptionsSource>(() => {
   if (useMultiLayer.value) {
@@ -755,6 +792,22 @@ h1 {
   border-radius: 8px;
   overflow: hidden;
   margin-bottom: 30px;
+}
+
+.editor-container.multi-instance {
+  display: flex;
+  gap: 12px;
+  height: auto;
+}
+
+.editor-container.multi-instance > :deep(.point-annotation),
+.editor-container.multi-instance > .point-annotation {
+  flex: 1;
+  min-width: 0;
+  height: 600px;
+  border: 1px solid #ddd;
+  border-radius: 8px;
+  overflow: hidden;
 }
 
 .controls {
