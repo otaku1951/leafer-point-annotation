@@ -1194,7 +1194,7 @@ const selectTool = () => {
   app.editor.config.resizeable = false
   app.editor.config.multipleSelect = true
   Object.values(canvasBrushesByLayer.value).forEach(brush => brush.setPointerEvents(false));
-  updateLabelEditable(true);
+  updateLabelEditable(false);
 };
 
 const pointTool = () => {
@@ -1204,7 +1204,7 @@ const pointTool = () => {
   app.editor.config.moveable = true
   app.editor.config.multipleSelect = false
   Object.values(canvasBrushesByLayer.value).forEach(brush => brush.setPointerEvents(false));
-  updateLabelEditable(true);
+  updateLabelEditable(false);
 };
 
 const brushTool = (openPanel?: boolean) => {
