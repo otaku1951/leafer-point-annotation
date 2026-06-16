@@ -13,7 +13,7 @@ English | [中文](README.md)
 - 📤 **Multi-format Export** - JSON / COCO / YOLO / Mask (dataURL / Blob / File)
 - 📱 **Custom Toolbar Support** - Hide built-in toolbar and build custom UI via ref API
 - 🔒 **Brush Disabling** - Use `enableBrush: false` to disable all brush functionality for point-only annotation
-- ⌨️ **Rich Keyboard Shortcuts** - `v`, `p`, `b`, `e`, `Ctrl+Z`, `Ctrl+Y`, `Delete`, and more
+- ⌨️ **Rich Keyboard Shortcuts** - `v`, `p`, `b`, `e`, `Ctrl+Z`, `Ctrl+Y`, `Delete`, and more (requires `options.enableHotkeys: true`)
 
 ---
 
@@ -154,6 +154,8 @@ interface OptionsSource {
   enableBrush?: boolean                     // Whether to enable brush (default: true);
                                             // When false, brush buttons/panel are not rendered,
                                             // and brushTool/eraserTool/mask export methods are disabled
+  enableHotkeys?: boolean                   // Whether to enable keyboard shortcuts (default: false);
+                                            // Shortcuts v/p/b/e/Ctrl+Z are only bound when true
 
   // ============ UI Toggles ============
   showToolbar?: boolean                     // Whether to show built-in toolbar (default: true)
@@ -532,21 +534,23 @@ function handlePoints(points: any[]) {
 
 ## Keyboard Shortcuts
 
-> Effective when: **Canvas has focus** or **mouse hovers over canvas**
+> Effective when: **`options.enableHotkeys: true`** + (**Canvas has focus** OR **mouse hovers over canvas**)
+>
+> `enableHotkeys` defaults to `false`. You must explicitly pass `true` to bind keyboard shortcuts.
 
 | Key | Function | Restriction |
 |-----|----------|-------------|
-| `v` | Select tool | - |
-| `p` | Point annotation tool | - |
-| `b` | Brush tool | Requires `enableBrush=true` |
-| `e` | Eraser tool | Requires `enableBrush=true` |
-| `Ctrl + Z` | Undo | - |
-| `Ctrl + Y` | Redo | - |
-| `Delete` | Delete selected point | - |
-| `Ctrl + +` | Zoom in | - |
-| `Ctrl + -` | Zoom out | - |
-| `Ctrl + 0` | Reset zoom | - |
-| `Alt` | Show/Hide shortcut hint overlay | - |
+| `v` | Select tool | Requires `enableHotkeys=true` |
+| `p` | Point annotation tool | Requires `enableHotkeys=true` |
+| `b` | Brush tool | Requires `enableHotkeys=true` + `enableBrush=true` |
+| `e` | Eraser tool | Requires `enableHotkeys=true` + `enableBrush=true` |
+| `Ctrl + Z` | Undo | Requires `enableHotkeys=true` |
+| `Ctrl + Y` | Redo | Requires `enableHotkeys=true` |
+| `Delete` | Delete selected point | Requires `enableHotkeys=true` |
+| `Ctrl + +` | Zoom in | Requires `enableHotkeys=true` |
+| `Ctrl + -` | Zoom out | Requires `enableHotkeys=true` |
+| `Ctrl + 0` | Reset zoom | Requires `enableHotkeys=true` |
+| `Alt` | Show/Hide shortcut hint overlay | Requires `enableHotkeys=true` |
 
 ---
 

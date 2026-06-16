@@ -13,7 +13,7 @@
 - 📤 多格式导出：JSON / COCO / YOLO / Mask (dataURL / Blob / File)
 - 📱 支持自定义工具栏（隐藏内置工具栏，调用 ref API 自行构建）
 - 🔒 `enableBrush: false` 可完全禁用笔刷，仅保留点标注
-- ⌨️ 丰富的键盘快捷键（`v` `p` `b` `e` `Ctrl+Z` `Ctrl+Y` `Delete` 等）
+- ⌨️ 丰富的键盘快捷键（`v` `p` `b` `e` `Ctrl+Z` `Ctrl+Y` `Delete` 等，需 `options.enableHotkeys: true`）
 
 ---
 
@@ -149,6 +149,8 @@ interface OptionsSource {
   enableBrush?: boolean                     // 是否启用笔刷（默认 true）；
                                             // false 时笔刷按钮/面板不渲染，
                                             // brushTool/eraserTool/mask 导出等方法失效
+  enableHotkeys?: boolean                   // 是否启用键盘快捷键（默认 false）；
+                                            // true 时才绑定 v/p/b/e/Ctrl+Z 等快捷键
 
   // ============ UI 开关 ============
   showToolbar?: boolean                     // 是否显示内置工具栏（默认 true）
@@ -527,21 +529,23 @@ function handlePoints(points: any[]) {
 
 ## 快捷键
 
-> 生效条件：**画布获得焦点** 或 **鼠标 hover 在画布上**
+> 生效条件：**`options.enableHotkeys: true`** + (**画布获得焦点** 或 **鼠标 hover 在画布上**)
+>
+> `enableHotkeys` 默认 `false`，需显式传 `true` 才会绑定快捷键。
 
 | 按键 | 功能 | 限制 |
 |------|------|------|
-| `v` | 选择工具 | - |
-| `p` | 点标注工具 | - |
-| `b` | 笔刷工具 | 需 `enableBrush=true` |
-| `e` | 橡皮擦工具 | 需 `enableBrush=true` |
-| `Ctrl + Z` | 撤销 | - |
-| `Ctrl + Y` | 重做 | - |
-| `Delete` | 删除选中的点 | - |
-| `Ctrl + +` | 放大 | - |
-| `Ctrl + -` | 缩小 | - |
-| `Ctrl + 0` | 重置缩放 | - |
-| `Alt` | 显示/隐藏快捷键提示浮层 | - |
+| `v` | 选择工具 | 需 `enableHotkeys=true` |
+| `p` | 点标注工具 | 需 `enableHotkeys=true` |
+| `b` | 笔刷工具 | 需 `enableHotkeys=true` + `enableBrush=true` |
+| `e` | 橡皮擦工具 | 需 `enableHotkeys=true` + `enableBrush=true` |
+| `Ctrl + Z` | 撤销 | 需 `enableHotkeys=true` |
+| `Ctrl + Y` | 重做 | 需 `enableHotkeys=true` |
+| `Delete` | 删除选中的点 | 需 `enableHotkeys=true` |
+| `Ctrl + +` | 放大 | 需 `enableHotkeys=true` |
+| `Ctrl + -` | 缩小 | 需 `enableHotkeys=true` |
+| `Ctrl + 0` | 重置缩放 | 需 `enableHotkeys=true` |
+| `Alt` | 显示/隐藏快捷键提示浮层 | 需 `enableHotkeys=true` |
 
 ---
 

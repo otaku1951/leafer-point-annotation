@@ -345,7 +345,8 @@ const editorOptions2 = computed<OptionsSource>(() => {
     },
     showToolbar: true,
     showZoomController: true,
-    enableBrush: enableBrush.value
+    enableBrush: enableBrush.value,
+    enableHotkeys: false
   }
 })
 
@@ -364,7 +365,8 @@ const editorOptions = computed<OptionsSource>(() => {
       canvasBackground: canvasBackground.value,
       zoomMin: zoomMin.value,
       zoomMax: zoomMax.value,
-      enableBrush: enableBrush.value
+      enableBrush: enableBrush.value,
+      enableHotkeys: false
     }
   }
   return {
@@ -374,7 +376,8 @@ const editorOptions = computed<OptionsSource>(() => {
     canvasBackground: canvasBackground.value,
     zoomMin: zoomMin.value,
     zoomMax: zoomMax.value,
-    enableBrush: enableBrush.value
+    enableBrush: enableBrush.value,
+    enableHotkeys: false
   }
 })
 

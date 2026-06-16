@@ -152,6 +152,8 @@ interface OptionsSource {
                                 //   - initBrushLayers 跳过 canvas 创建
                                 //   - mask 导出相关方法返回 null/{}
                                 //   - 删除确认文案不包含"笔刷"
+  enableHotkeys?: boolean       // 默认 false；设为 true 时才绑定 tinykeys 快捷键
+                                //   (v/p/b/e/Ctrl+Z/Ctrl+Y/Delete/Ctrl+±/Ctrl+0/Alt)
 }
 ```
 

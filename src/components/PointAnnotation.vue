@@ -319,6 +319,7 @@ export interface OptionsSource {
   zoomMin?: number;
   zoomMax?: number;
   enableBrush?: boolean;
+  enableHotkeys?: boolean;
 }
 
 const props = defineProps({
@@ -1028,74 +1029,77 @@ onMounted(() => {
     window.addEventListener("mousemove", handleMouseMove);
     window.addEventListener("focusout", handleFocusOut);
 
-    const unsubscribe = tinykeys(window, {
-      v: (event: KeyboardEvent) => {
-        if (!isCanvasFocused.value && !isMouseOverCanvas.value) return;
-        event.preventDefault();
-        selectTool();
-      },
-      p: (event: KeyboardEvent) => {
-        if (!isCanvasFocused.value && !isMouseOverCanvas.value) return;
-        event.preventDefault();
-        pointTool();
-      },
-      b: (event: KeyboardEvent) => {
-        if (!effectiveEnableBrush.value) return;
-        if (!isCanvasFocused.value && !isMouseOverCanvas.value) return;
-        event.preventDefault();
-        brushTool();
-      },
-      e: (event: KeyboardEvent) => {
-        if (!effectiveEnableBrush.value) return;
-        if (!isCanvasFocused.value && !isMouseOverCanvas.value) return;
-        event.preventDefault();
-        eraserTool();
-      },
-      "$mod+KeyZ": (event: KeyboardEvent) => {
-        if (!isCanvasFocused.value && !isMouseOverCanvas.value) return;
-        event.preventDefault();
-        event.stopPropagation();
-        undo();
-      },
-      "$mod+KeyY": (event: KeyboardEvent) => {
-        if (!isCanvasFocused.value && !isMouseOverCanvas.value) return;
-        event.preventDefault();
-        event.stopPropagation();
-        redo();
-      },
-      Delete: (event: KeyboardEvent) => {
-        if (!isCanvasFocused.value && !isMouseOverCanvas.value) return;
-        event.preventDefault();
-        event.stopPropagation();
-        deleteSelected();
-      },
-      "$mod+Equal": (event: KeyboardEvent) => {
-        if (!isCanvasFocused.value && !isMouseOverCanvas.value) return;
-        event.preventDefault();
-        event.stopPropagation();
-        zoomIn();
-      },
-      "$mod+Minus": (event: KeyboardEvent) => {
-        if (!isCanvasFocused.value && !isMouseOverCanvas.value) return;
-        event.preventDefault();
-        event.stopPropagation();
-        zoomOut();
-      },
-      "$mod+0": (event: KeyboardEvent) => {
-        if (!isCanvasFocused.value && !isMouseOverCanvas.value) return;
-        event.preventDefault();
-        event.stopPropagation();
-        resetZoom();
-      },
-      Alt: (event: KeyboardEvent) => {
-        if (!isCanvasFocused.value && !isMouseOverCanvas.value) return;
-        event.preventDefault();
-        showHotkeys.value = !showHotkeys.value;
-      },
-    });
+    // 根据 enableHotkeys 配置决定是否注册热键（默认不启用，显式传 true 才启用）
+    if (props.options.enableHotkeys) {
+      const unsubscribe = tinykeys(window, {
+        v: (event: KeyboardEvent) => {
+          if (!isCanvasFocused.value && !isMouseOverCanvas.value) return;
+          event.preventDefault();
+          selectTool();
+        },
+        p: (event: KeyboardEvent) => {
+          if (!isCanvasFocused.value && !isMouseOverCanvas.value) return;
+          event.preventDefault();
+          pointTool();
+        },
+        b: (event: KeyboardEvent) => {
+          if (!effectiveEnableBrush.value) return;
+          if (!isCanvasFocused.value && !isMouseOverCanvas.value) return;
+          event.preventDefault();
+          brushTool();
+        },
+        e: (event: KeyboardEvent) => {
+          if (!effectiveEnableBrush.value) return;
+          if (!isCanvasFocused.value && !isMouseOverCanvas.value) return;
+          event.preventDefault();
+          eraserTool();
+        },
+        "$mod+KeyZ": (event: KeyboardEvent) => {
+          if (!isCanvasFocused.value && !isMouseOverCanvas.value) return;
+          event.preventDefault();
+          event.stopPropagation();
+          undo();
+        },
+        "$mod+KeyY": (event: KeyboardEvent) => {
+          if (!isCanvasFocused.value && !isMouseOverCanvas.value) return;
+          event.preventDefault();
+          event.stopPropagation();
+          redo();
+        },
+        Delete: (event: KeyboardEvent) => {
+          if (!isCanvasFocused.value && !isMouseOverCanvas.value) return;
+          event.preventDefault();
+          event.stopPropagation();
+          deleteSelected();
+        },
+        "$mod+Equal": (event: KeyboardEvent) => {
+          if (!isCanvasFocused.value && !isMouseOverCanvas.value) return;
+          event.preventDefault();
+          event.stopPropagation();
+          zoomIn();
+        },
+        "$mod+Minus": (event: KeyboardEvent) => {
+          if (!isCanvasFocused.value && !isMouseOverCanvas.value) return;
+          event.preventDefault();
+          event.stopPropagation();
+          zoomOut();
+        },
+        "$mod+0": (event: KeyboardEvent) => {
+          if (!isCanvasFocused.value && !isMouseOverCanvas.value) return;
+          event.preventDefault();
+          event.stopPropagation();
+          resetZoom();
+        },
+        Alt: (event: KeyboardEvent) => {
+          if (!isCanvasFocused.value && !isMouseOverCanvas.value) return;
+          event.preventDefault();
+          showHotkeys.value = !showHotkeys.value;
+        },
+      });
 
-    // 🔧 多实例支持：unsubscribe 保存在当前组件作用域，不再使用全局 window 存储
-    hotkeysUnsubscribe = unsubscribe;
+      // 🔧 多实例支持：unsubscribe 保存在当前组件作用域，不再使用全局 window 存储
+      hotkeysUnsubscribe = unsubscribe;
+    }
   });
 });
 
