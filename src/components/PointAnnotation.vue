@@ -271,7 +271,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted, onUnmounted, nextTick, computed, watch } from "vue";
+import { ref, onMounted, onUnmounted, nextTick, computed, watch, PropType } from "vue";
 import {
   App,
   ImageEvent,
@@ -314,6 +314,14 @@ const props = defineProps({
     type: String,
     required: false,
     default: null,
+  },
+  // 📍 创建点标注前的回调：父组件可做业务判定
+  // 返回 false 阻止创建；支持 Promise<boolean> 用于异步场景（如弹确认框）
+  // 参数：x(像素X), y(像素Y), normalizedX(0-1), normalizedY(0-1), existingPointCount(已有点数)
+  beforeCreatePoint: {
+    type: Function as PropType<(x: number, y: number, normalizedX: number, normalizedY: number, existingPointCount: number) => boolean | Promise<boolean>>,
+    required: false,
+    default: undefined,
   },
 });
 
@@ -1412,7 +1420,7 @@ const handleBrushUp = () => {
 // };
 
 // 处理画布点击事件
-const handleCanvasTap = (e: any) => {
+const handleCanvasTap = async (e: any) => {
   if (currentTool.value !== 'point' || !app || !imageBox) return;
 
   // 如果编辑器正处于编辑状态（有点标注被选中），不创建新标注
@@ -1434,8 +1442,8 @@ const handleCanvasTap = (e: any) => {
     return;
   }
 
-  // 创建点标注
-  createPointAnnotation(point.x, point.y);
+  // 创建点标注（beforeCreatePoint 检查统一放在 createPointAnnotation 内部）
+  await createPointAnnotation(point.x, point.y);
 };
 
 // 处理点击【标注点】选中样式
@@ -1504,8 +1512,21 @@ const handlePointAnnotationSelected = (e: any) => {
 };
 
 // 创建点标注
-const createPointAnnotation = (pixelX: number, pixelY: number): string | null => {
+const createPointAnnotation = async (pixelX: number, pixelY: number): Promise<string | null> => {
   if (!imageWidth.value || !imageHeight.value) return null;
+
+  // 📍 创建点标注前，父组件可介入做业务判定
+  if (props.beforeCreatePoint) {
+    const normalizedX = pixelX / (imageWidth.value || 1);
+    const normalizedY = pixelY / (imageHeight.value || 1);
+    const result = props.beforeCreatePoint(
+      pixelX, pixelY,
+      normalizedX, normalizedY,
+      pointAnnotations.value.length
+    );
+    const allow = result instanceof Promise ? await result : result;
+    if (!allow) return null;
+  }
 
   // const id = `point_${generateUUID()}`;
   const id = `point_${pointCounter.value}`

@@ -107,6 +107,10 @@
   imageSource?: { url: string, id?: string }   // 图片来源；不传则显示上传区域（支持点击+拖拽）
   options?: OptionsSource                       // 所有可配置项（见下方）
   currentLayer?: string                         // 受控模式：父组件驱动当前图层
+  beforeCreatePoint?: (x, y, nx, ny, existingPointCount) => boolean | Promise<boolean>
+  // 点标注创建前回调，父组件可在此判定是否允许创建，支持同步/异步返回
+  // 返回 true 允许创建，false 阻止创建
+  // 该回调在 handleCanvasTap 和 createPointAnnotation 两个路径都会被触发
 }
 
 // Events（defineEmits）
@@ -114,6 +118,28 @@ pointChange | loadStart | loadSuccess | loadError
 undoStateChange | redoStateChange
 update:currentLayer | layerChange
 ```
+
+**beforeCreatePoint 触发流程（必知）**：
+
+```
+handleCanvasTap(e)
+  └─> createPointAnnotation(pixelX, pixelY)      // 唯一创建入口
+        ├─> 读取 imageWidth/imageHeight（若未加载，返回 null）
+        ├─> ✨ 若 props.beforeCreatePoint 存在
+        │      ├─> 计算 normalizedX = pixelX / imageWidth
+        │      ├─> 计算 normalizedY = pixelY / imageHeight
+        │      └─> 调用 beforeCreatePoint(x, y, nx, ny, pointAnnotations.value.length)
+        │           └─> 同步：立即判断返回值
+        │           └─> 异步（Promise）：await 后判断
+        │                └─> 返回 false → return null（提前终止，不 emit）
+        ├─> 创建 PointAnnotationElement（Leafer 自定义元素）
+        ├─> 推入 pointLayer / pointAnnotations.value
+        ├─> 推入 AddPointCommand（undo/redo 栈）
+        ├─> emit('pointChange', pointAnnotations.value)
+        └─> 返回新点 id
+```
+
+> **关键设计**：`beforeCreatePoint` 仅在 `createPointAnnotation` 一个函数内执行，避免了「点击触发一次、程序化调用再触发一次」导致的重复判定问题。
 
 ### 3.2 OptionsSource - 完整配置项
 
@@ -400,6 +426,16 @@ npm publish            # 发布到 npm（需先登录 npm）
 
 ### Q6. 多图层如何切换？
 - 通过 `options.brushLayers: [{label, value, color?, opacity?, size?}]` 配置多个图层；父组件可通过 `v-model:currentLayer="'layerA'"` 或 `setActiveLayer('layerA')` 控制当前图层。
+
+### Q7. 我需要在点标注创建前做业务校验（如数量限制、区域限制、二次确认），怎么办？
+- 使用 `:before-create-point="yourCallback"` prop。
+- 回调签名：`(x: number, y: number, normalizedX: number, normalizedY: number, existingPointCount: number) => boolean | Promise<boolean>`。
+- 返回 `false` 或 `Promise<false>` 时会**提前终止点的创建**，不写入数据、不进 undo 栈、不 emit pointChange。
+- **典型用法**：
+  - `count >= 20 → false`（数量限制）
+  - `normalizedX < 0.5 → false`（只允许在右半部分标注）
+  - `window.confirm('确认创建?')`（异步二次确认）
+- **注意**：该回调仅在 `createPointAnnotation()` 内部执行一次，`handleCanvasTap` 不再重复调用，避免了「两次判定、两次弹窗」的问题。
 
 ---
 

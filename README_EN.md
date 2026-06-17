@@ -14,6 +14,8 @@ English | [中文](README.md)
 - 📱 **Custom Toolbar Support** - Hide built-in toolbar and build custom UI via ref API
 - 🔒 **Brush Disabling** - Use `enableBrush: false` to disable all brush functionality for point-only annotation
 - ⌨️ **Rich Keyboard Shortcuts** - `v`, `p`, `b`, `e`, `Ctrl+Z`, `Ctrl+Y`, `Delete`, and more (requires `options.enableHotkeys: true`)
+- 🔍 **`beforeCreatePoint` Pre-create Callback** - Intervene before a point annotation is created, supporting sync and async returns for count limits, area restrictions, or user confirmation
+- 📦 **Centralized TypeScript Type Exports** - `import type { OptionsSource, PointAnnotationItem, ImageSource, PointStyle, BrushStyle, ... } from '@zzalai/leafer-point-annotation'`
 
 ---
 
@@ -24,8 +26,10 @@ English | [中文](README.md)
 - [Props Configuration](#props-configuration)
   - [imageSource](#imagesource)
   - [options](#options)
+  - [beforeCreatePoint (Pre-create Callback)](#beforecreatepoint-pre-create-callback)
   - [currentLayer (v-model:currentLayer)](#currentlayer-v-modelcurrentlayer)
 - [Events](#events)
+- [TypeScript Type Imports](#typescript-type-imports)
 - [Ref API (Parent Component Calls)](#ref-api-parent-component-calls)
   - [Point Annotation](#point-annotation)
   - [Image & Canvas](#image--canvas)
@@ -43,6 +47,7 @@ English | [中文](README.md)
   - [Multi-layer Brush](#multi-layer-brush)
   - [Backend Upload Mask (Blob/File)](#backend-upload-mask-blobfile)
   - [Point-Only Annotation (Disable Brush)](#point-only-annotation-disable-brush)
+  - [Pre-create Callback (beforeCreatePoint)](#pre-create-callback-beforecreatepoint)
 - [Keyboard Shortcuts](#keyboard-shortcuts)
 - [Development & Build](#development--build)
 - [License](#license)
@@ -248,6 +253,60 @@ interface BrushLayerConfig {
 
 When `brushLayers` is not provided, defaults to a single layer `{label:'Default Layer', value:'default'}`.
 
+### beforeCreatePoint (Pre-create Callback)
+
+Called **before each point annotation is created**. The parent component can allow/block creation via the return value, supporting both synchronous and asynchronous returns (e.g., waiting for user confirmation in a dialog).
+
+```ts
+type BeforeCreatePoint = (
+  x: number,                   // pixel x (image coordinates)
+  y: number,                   // pixel y (image coordinates)
+  normalizedX: number,         // normalized x (0 ~ 1)
+  normalizedY: number,         // normalized y (0 ~ 1)
+  existingPointCount: number   // number of existing points before creation
+) => boolean | Promise<boolean>
+```
+
+**Return value rules**:
+- `true` → allow creation
+- `false` → block creation
+- `Promise<true> / Promise<false>` → wait for async result (e.g., `window.confirm`)
+
+**Effective path**: Both user canvas clicks and programmatic calls via `ref.createPointAnnotation()` go through the same pre-create check.
+
+**Typical usage**:
+
+```ts
+// 1) Limit to max 20 points
+function beforeCreatePoint(x: number, y: number, nx: number, ny: number, count: number) {
+  return count < 20
+}
+
+// 2) Only allow on the right half of the image
+function beforeCreatePoint(x: number, y: number, nx: number, ny: number) {
+  return nx > 0.5
+}
+
+// 3) Async: show confirm dialog
+async function beforeCreatePoint(x: number, y: number) {
+  return window.confirm(`Create point at (${Math.round(x)}, ${Math.round(y)})?`)
+}
+
+// 4) Combined: count limit + area restriction + confirmation
+async function beforeCreatePoint(x: number, y: number, nx: number, ny: number, count: number) {
+  if (count >= 5) { console.warn('Max 5 points'); return false }
+  if (nx < 0.5) { console.warn('Right half only'); return false }
+  return window.confirm('Create point?')
+}
+```
+
+```vue
+<PointAnnotation
+  :image-source="imageSource"
+  :before-create-point="beforeCreatePoint"
+/>
+```
+
 ### currentLayer (v-model:currentLayer)
 
 Controlled layer switching. For example:
@@ -279,6 +338,65 @@ Controlled layer switching. For example:
 
 ---
 
+## TypeScript Type Imports
+
+All public types and default constants are exported from the package root. Import directly from `@zzalai/leafer-point-annotation`:
+
+```ts
+import PointAnnotation from '@zzalai/leafer-point-annotation'
+
+// 👇 Types (import type — type hints only, not bundled)
+import type {
+  PointAnnotationItem,   // Point annotation data structure (named PointAnnotationItem
+                         // to avoid naming conflict with the Vue component)
+  OptionsSource,         // Type of :options prop
+  ImageSource,           // Type of :image-source prop
+  PointStyle,            // Point annotation style config
+  BrushStyle,            // Brush style config
+  BrushLayerConfig,      // Multi-layer config item
+  BrushStrokeData,       // Brush stroke data
+  ToolType,              // 'select' | 'point' | 'brush' | 'eraser'
+  ExportFormat,          // Export format
+  ExportOptions,         // Export options
+  ImportOptions,         // Import options
+  Statistics,            // Statistics info
+  ExportData,            // Full export data structure
+} from '@zzalai/leafer-point-annotation'
+
+// 👇 Default constants (value imports, available at runtime)
+import {
+  DEFAULT_POINT_STYLE,   // Default point annotation style
+  DEFAULT_BRUSH_STYLE,   // Default brush style
+} from '@zzalai/leafer-point-annotation'
+
+// Must manually import styles
+import '@zzalai/leafer-point-annotation/dist/leafer-point-annotation.css'
+```
+
+**Component instance type**:
+```ts
+const annotationRef = ref<InstanceType<typeof PointAnnotation> | null>(null)
+```
+
+**Parent component Props type example**:
+```ts
+import type { OptionsSource, ImageSource } from '@zzalai/leafer-point-annotation'
+
+const imageSource = ref<ImageSource>({ url: 'https://example.com/image.jpg' })
+
+const options = ref<Partial<OptionsSource>>({
+  enableBrush: true,
+  enableHotkeys: false,
+  pointStyle: { circleFill: '#ff4d4f' },
+  brushLayers: [
+    { label: 'Foreground', value: 'foreground', color: '#1890ff', opacity: 0.55 },
+    { label: 'Occlusion',  value: 'occlusion',  color: '#faad14', opacity: 0.55 },
+  ],
+})
+```
+
+---
+
 ## Ref API (Parent Component Calls)
 
 After accessing the component instance via `ref`, you can call the following methods.
@@ -297,7 +415,7 @@ annotationRef.value?.getMaskBlob()                  // Export current layer as B
 | Method | Description |
 |--------|-------------|
 | `getPointAnnotations(): PointAnnotation[]` | Get all current points |
-| `createPointAnnotation(x: number, y: number, label?: string): boolean` | Programmatically add a point |
+| `createPointAnnotation(x: number, y: number, label?: string): Promise<string \| null>` | Programmatically add a point (returns the new point id or null; returns null when `beforeCreatePoint` returns false) |
 | `removePointAnnotation(id: string): boolean` | Programmatically delete a point |
 | `updatePointAnnotationLabel(id: string, label: string): boolean` | Modify a point's label text |
 
@@ -527,6 +645,48 @@ import '@zzalai/leafer-point-annotation/dist/leafer-point-annotation.css'
 const annotationRef = ref<InstanceType<typeof PointAnnotation> | null>(null)
 function handlePoints(points: any[]) {
   console.log('Points:', points)
+}
+</script>
+```
+
+### Pre-create Callback (beforeCreatePoint)
+
+```vue
+<template>
+  <PointAnnotation
+    ref="annotationRef"
+    :image-source="{ url: '...' }"
+    :before-create-point="beforeCreatePoint"
+    @point-change="handlePoints"
+  />
+</template>
+
+<script setup lang="ts">
+import { ref } from 'vue'
+import PointAnnotation from '@zzalai/leafer-point-annotation'
+import '@zzalai/leafer-point-annotation/dist/leafer-point-annotation.css'
+
+const annotationRef = ref<InstanceType<typeof PointAnnotation> | null>(null)
+
+// Example: max 5 points + allow only on right half + confirmation before creation
+async function beforeCreatePoint(
+  x: number, y: number,
+  nx: number, ny: number,
+  count: number
+) {
+  if (count >= 5) {
+    console.warn('Max 5 points')
+    return false
+  }
+  if (nx < 0.5) {
+    console.warn('Only right half is allowed')
+    return false
+  }
+  return window.confirm(`Create point ${count + 1} at (${Math.round(x)}, ${Math.round(y)})?`)
+}
+
+function handlePoints(points: any[]) {
+  console.log('Point list:', points)
 }
 </script>
 ```

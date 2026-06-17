@@ -8,6 +8,7 @@
         :imageSource="imageSource" 
         :options="editorOptions"
         v-model:currentLayer="activeLayer"
+        :before-create-point="useBeforeCreatePoint ? beforeCreatePoint : undefined"
         @pointChange="handlePointChange"
         @loadStart="handleLoadStart"
         @loadSuccess="handleLoadSuccess"
@@ -82,6 +83,7 @@
           <label><input type="checkbox" v-model="showZoomController" /> 显示缩放控制器</label>
           <label><input type="checkbox" v-model="enableBrush" /> 启用笔刷功能</label>
           <label><input type="checkbox" v-model="enableMultiInstance" /> 双实例测试（验证多实例快捷键不冲突）</label>
+          <label><input type="checkbox" v-model="useBeforeCreatePoint" /> beforeCreatePoint 前置判定（限 5 点+ 右半区域 + 确认框）</label>
         </div>
         <div class="multi-layer-row">
           <label>背景色: <input type="color" v-model="canvasBackground" style="width: 40px; height: 28px; vertical-align: middle; margin-left: 6px;" /></label>
@@ -287,6 +289,7 @@ const imageSource = computed(() => {
 
 // --- 多图层相关 ---
 const useMultiLayer = ref(false)
+const useBeforeCreatePoint = ref(false)  // 📍 beforeCreatePoint 开关
 const layerConfig = [
   { label: '前景区域', value: 'foreground' },
   { label: '背景区域', value: 'background' },
@@ -543,6 +546,35 @@ const reselectLocalImage = () => {
   pointAnnotation.value?.openFileDialog()
 }
 
+// 📍 beforeCreatePoint 示例：创建点标注前的业务判定
+// 开启 useBeforeCreatePoint 开关后生效，演示 3 种典型场景：
+//   1. 限制最多 5 个点
+//   2. 只允许在图片右半部分创建
+//   3. 创建前弹确认框（异步）
+const beforeCreatePoint = async (
+  x: number, y: number,
+  normalizedX: number, _normalizedY: number,
+  existingPointCount: number
+) => {
+  // 示例 1：限制点数量
+  if (existingPointCount >= 5) {
+    console.warn('[beforeCreatePoint] 最多只能创建 5 个点标注，已阻止')
+    return false
+  }
+
+  // 示例 2：只允许在图片右半部分创建
+  if (normalizedX < 0.5) {
+    console.warn(`[beforeCreatePoint] 点击位置 (nx=${normalizedX.toFixed(2)}) 不在右半部分，已阻止`)
+    return false
+  }
+
+  // 示例 3：异步确认（实际业务可以替换为 UI 组件的确认框）
+  const confirmed = window.confirm(
+    `确定在坐标 (${Math.round(x)}, ${Math.round(y)}) 创建第 ${existingPointCount + 1} 个点标注吗？`
+  )
+  return confirmed
+}
+
 // 导出点数据
 const exportData = () => {
   // 调用PointAnnotation的getPointAnnotations方法获取最新数据
@@ -692,9 +724,9 @@ const callSetTool = () => {
   }
 }
 
-const testAddPoint = () => {
+const testAddPoint = async () => {
   if (pointAnnotation.value) {
-    const id = pointAnnotation.value.createPointAnnotation(100, 100)
+    const id = await pointAnnotation.value.createPointAnnotation(100, 100)
     if (id) {
       lastAddedPointId.value = id
       alert(`Point added with id: ${id}`)

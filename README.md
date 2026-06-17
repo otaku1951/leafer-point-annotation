@@ -14,6 +14,8 @@
 - 📱 支持自定义工具栏（隐藏内置工具栏，调用 ref API 自行构建）
 - 🔒 `enableBrush: false` 可完全禁用笔刷，仅保留点标注
 - ⌨️ 丰富的键盘快捷键（`v` `p` `b` `e` `Ctrl+Z` `Ctrl+Y` `Delete` 等，需 `options.enableHotkeys: true`）
+- 🔍 **`beforeCreatePoint` 前置判定回调**（创建点标注前介入，支持同步/异步，适用于数量限制、区域限制、用户二次确认等场景）
+- 📦 **TypeScript 类型集中导出**（`import type { OptionsSource, PointAnnotationItem, ImageSource, PointStyle, BrushStyle, ... } from '@zzalai/leafer-point-annotation'`）
 
 ---
 
@@ -24,8 +26,10 @@
 - [Props 配置](#props-配置)
   - [imageSource](#imagesource)
   - [options](#options)
+  - [beforeCreatePoint（创建点前回调）](#beforecreatepoint创建点前回调)
   - [currentLayer（v-model:currentLayer）](#currentlayerv-modelcurrentlayer)
 - [Events 事件](#events-事件)
+- [TypeScript 类型导入](#typescript-类型导入)
 - [Ref API（父组件调用）](#ref-api父组件调用)
   - [点标注](#点标注)
   - [图片 & 画布](#图片-画布)
@@ -43,6 +47,7 @@
   - [多图层笔刷](#多图层笔刷)
   - [后端上传 Mask（Blob/File）](#后端上传-mask-blobfile)
   - [只启用点标注（禁用笔刷）](#只启用点标注禁用笔刷)
+  - [点标注前回调（beforeCreatePoint）](#点标注前回调beforecreatepoint)
 - [快捷键](#快捷键)
 - [开发与构建](#开发与构建)
 - [许可证](#许可证)
@@ -243,6 +248,60 @@ interface BrushLayerConfig {
 
 不传 `brushLayers` 时默认为单图层 `{label:'默认图层', value:'default'}`。
 
+### beforeCreatePoint（创建点前回调）
+
+在**每次点标注被创建前**调用，父组件可通过返回值**允许/阻止**该点被创建，支持同步返回与异步返回（例如弹确认框等待用户选择）。
+
+```ts
+type BeforeCreatePoint = (
+  x: number,                   // 点击位置的像素 x（图片坐标系）
+  y: number,                   // 点击位置的像素 y（图片坐标系）
+  normalizedX: number,         // 归一化 x（0 ~ 1）
+  normalizedY: number,         // 归一化 y（0 ~ 1）
+  existingPointCount: number   // 当前已有多少个点（即 this.pointAnnotations.length）
+) => boolean | Promise<boolean>
+```
+
+**返回值规则**：
+- `true` → 允许创建
+- `false` → 阻止创建
+- `Promise<true> / Promise<false>` → 异步等待后决定是否创建（如弹 `window.confirm`）
+
+**生效路径**：用户画布点击 / 父组件通过 ref 调用 `createPointAnnotation()` 两种路径都会经过相同的前置判定。
+
+**典型用法**：
+
+```ts
+// 1) 限制最多 20 个点
+function beforeCreatePoint(x: number, y: number, nx: number, ny: number, count: number) {
+  return count < 20
+}
+
+// 2) 只允许在图片右半部分（x > 宽度的 50%）
+function beforeCreatePoint(x: number, y: number, nx: number, ny: number) {
+  return nx > 0.5
+}
+
+// 3) 异步：弹确认框（实际业务可替换为 UI 组件的确认弹窗）
+async function beforeCreatePoint(x: number, y: number) {
+  return window.confirm(`在坐标 (${Math.round(x)}, ${Math.round(y)}) 创建点？`)
+}
+
+// 4) 组合使用：数量限制 + 区域限制
+async function beforeCreatePoint(x: number, y: number, nx: number, ny: number, count: number) {
+  if (count >= 5) { console.warn('最多 5 个点'); return false }
+  if (nx < 0.5) { console.warn('只允许在右半部分标注'); return false }
+  return window.confirm('确认创建？')
+}
+```
+
+```vue
+<PointAnnotation
+  :image-source="imageSource"
+  :before-create-point="beforeCreatePoint"
+/>
+```
+
 ### currentLayer（v-model:currentLayer）
 
 受控图层切换。例如：
@@ -274,6 +333,65 @@ interface BrushLayerConfig {
 
 ---
 
+## TypeScript 类型导入
+
+所有对外类型与默认常量都从包根导出，可直接从 `@zzalai/leafer-point-annotation` 导入：
+
+```ts
+import PointAnnotation from '@zzalai/leafer-point-annotation'
+
+// 👇 类型（import type，仅作类型提示用，不参与打包）
+import type {
+  PointAnnotationItem,   // 点标注数据结构（注意：命名为 PointAnnotationItem，
+                         // 避免与 Vue 组件 PointAnnotation 命名冲突）
+  OptionsSource,         // :options 的类型
+  ImageSource,           // :image-source 的类型
+  PointStyle,            // 点标注样式配置
+  BrushStyle,            // 笔刷样式配置
+  BrushLayerConfig,      // 多图层配置项
+  BrushStrokeData,       // 笔刷笔画数据
+  ToolType,              // 'select' | 'point' | 'brush' | 'eraser'
+  ExportFormat,          // 导出格式
+  ExportOptions,         // 导出选项
+  ImportOptions,         // 导入选项
+  Statistics,            // 统计信息
+  ExportData,            // 完整导出数据结构
+} from '@zzalai/leafer-point-annotation'
+
+// 👇 默认常量（value import，运行时可用）
+import {
+  DEFAULT_POINT_STYLE,   // 默认点标注样式
+  DEFAULT_BRUSH_STYLE,   // 默认笔刷样式
+} from '@zzalai/leafer-point-annotation'
+
+// 必须手动导入样式
+import '@zzalai/leafer-point-annotation/dist/leafer-point-annotation.css'
+```
+
+**组件实例类型**：
+```ts
+const annotationRef = ref<InstanceType<typeof PointAnnotation> | null>(null)
+```
+
+**父组件 Props 类型示例**：
+```ts
+import type { OptionsSource, ImageSource } from '@zzalai/leafer-point-annotation'
+
+const imageSource = ref<ImageSource>({ url: 'https://example.com/image.jpg' })
+
+const options = ref<Partial<OptionsSource>>({
+  enableBrush: true,
+  enableHotkeys: false,
+  pointStyle: { circleFill: '#ff4d4f' },
+  brushLayers: [
+    { label: '前景', value: 'foreground', color: '#1890ff', opacity: 0.55 },
+    { label: '遮挡', value: 'occlusion', color: '#faad14', opacity: 0.55 },
+  ],
+})
+```
+
+---
+
 ## Ref API（父组件调用）
 
 通过 `ref` 访问组件实例后可调用以下方法。
@@ -292,7 +410,7 @@ annotationRef.value?.getMaskBlob()                // 导出当前图层 Blob（�
 | 方法 | 说明 |
 |------|------|
 | `getPointAnnotations(): PointAnnotation[]` | 获取当前所有点 |
-| `createPointAnnotation(x: number, y: number, label?: string): boolean` | 程序化新增一个点 |
+| `createPointAnnotation(x: number, y: number, label?: string): Promise<string \| null>` | 程序化新增一个点（返回新点 id 或 null；若配置了 `beforeCreatePoint` 并返回 false 则返回 null） |
 | `removePointAnnotation(id: string): boolean` | 程序化删除一个点 |
 | `updatePointAnnotationLabel(id: string, label: string): boolean` | 修改某个点的 label |
 
@@ -522,6 +640,48 @@ import '@zzalai/leafer-point-annotation/dist/leafer-point-annotation.css'
 const annotationRef = ref<InstanceType<typeof PointAnnotation> | null>(null)
 function handlePoints(points: any[]) {
   console.log('标注：', points)
+}
+</script>
+```
+
+### 点标注前回调（beforeCreatePoint）
+
+```vue
+<template>
+  <PointAnnotation
+    ref="annotationRef"
+    :image-source="{ url: '...' }"
+    :before-create-point="beforeCreatePoint"
+    @point-change="handlePoints"
+  />
+</template>
+
+<script setup lang="ts">
+import { ref } from 'vue'
+import PointAnnotation from '@zzalai/leafer-point-annotation'
+import '@zzalai/leafer-point-annotation/dist/leafer-point-annotation.css'
+
+const annotationRef = ref<InstanceType<typeof PointAnnotation> | null>(null)
+
+// 示例：限制最多 5 个点 + 只允许在图片右半部分创建 + 创建前二次确认
+async function beforeCreatePoint(
+  x: number, y: number,
+  nx: number, ny: number,
+  count: number
+) {
+  if (count >= 5) {
+    console.warn('最多 5 个点标注')
+    return false
+  }
+  if (nx < 0.5) {
+    console.warn('只允许在右半部分标注')
+    return false
+  }
+  return window.confirm(`在 (${Math.round(x)}, ${Math.round(y)}) 创建第 ${count + 1} 个点？`)
+}
+
+function handlePoints(points: any[]) {
+  console.log('点列表：', points)
 }
 </script>
 ```

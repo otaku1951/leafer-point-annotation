@@ -28,6 +28,7 @@
 - `fixedSizeOnZoom`：点不随画布缩放变大
 - 点样式完全可配（circleFill、circleStroke、hover*、selected*、label 样式等）
 - `maxPoints` 可配置最大点数限制
+- ✨ **`beforeCreatePoint` 创建前回调**：`props.beforeCreatePoint(x, y, nx, ny, existingPointCount)`，父组件可返回 `boolean | Promise<boolean>` 控制是否允许创建，支持同步判定和异步二次确认
 
 ### 2.2 多图层笔刷功能
 - 每个图层一个 HTML canvas + 独立 CanvasBrush 实例
@@ -63,7 +64,8 @@
 ### 2.6 工具栏与快捷键
 - 内置工具栏包含：select、point、brush、eraser、delete、clear、undo、redo
 - `showToolbar: false` / `showZoomController: false` 隐藏内置 UI，父组件自定义
-- 快捷键生效条件：画布 focus 或 hover 画布
+- ✨ **`enableHotkeys`（默认 false）**：`options.enableHotkeys = true` 时才启用快捷键，默认全部禁用
+- 快捷键生效条件：`enableHotkeys = true` 且画布 focus 或 hover 画布
 - 快捷键列表：`v` (select)、`p` (point)、`b` (brush, 需 enableBrush)、`e` (eraser, 需 enableBrush)、`Ctrl+Z` (undo)、`Ctrl+Y` (redo)、`Delete` (删除选中)、`Ctrl++/-` (缩放)、`Ctrl+0` (重置)、`Alt` (快捷键提示)
 
 ### 2.7 图片加载
@@ -71,6 +73,8 @@
 - 不传 imageSource 时显示大面积上传区域（点击选择 + 拖拽文件）
 - 本地图片上传后若 props.url 变化，会重新加载远程
 - 无图片时不渲染画布/工具栏/缩放控制器
+- ✨ **`openFileDialog()`**：父组件可调用此方法弹出本地文件选择框，无需父组件自行处理 `<input type="file">` / FileReader
+- ✨ **切换图片时自动重置**：`loadImage()` 切换到新图片时会自动清空所有点标注、清空所有图层笔刷内容、重置 undo/redo 栈
 
 ---
 
@@ -83,6 +87,7 @@
 | `imageSource` | `{ url: string, id?: string }` | 图片来源；不传则显示本地上传区域 |
 | `options` | `OptionsSource` | 所有可配置项（详见下方） |
 | `currentLayer` | `string` | v-model 受控图层切换 |
+| `beforeCreatePoint` | `(x, y, nx, ny, count) => boolean \| Promise<boolean>` | ✨ 点创建前回调，父组件可控制是否允许创建；返回 false 时提前终止创建流程 |
 
 ### 3.2 OptionsSource 关键字段
 
@@ -90,6 +95,7 @@
 interface OptionsSource {
   // 功能开关
   enableBrush?: boolean                     // ✨ 是否启用笔刷（默认 true），false 时所有笔刷功能失效
+  enableHotkeys?: boolean                   // ✨ 是否启用键盘快捷键（默认 false），默认全部禁用
 
   // UI 开关
   showToolbar?: boolean                     // 是否显示内置工具栏（默认 true）
@@ -140,6 +146,38 @@ interface BrushLayerConfig {
 }
 ```
 
+### 3.4 ✨ TypeScript 类型集中导出
+
+所有对外类型与默认常量都从包根 `index.ts` 导出，使用者可直接从 `@zzalai/leafer-point-annotation` 导入，无需自行从子路径引入：
+
+```ts
+import PointAnnotation from '@zzalai/leafer-point-annotation'
+
+// 类型（import type，仅作类型提示，不打包）
+import type {
+  PointAnnotationItem,      // 点标注数据结构（注意命名为 PointAnnotationItem，避免与组件名冲突）
+  OptionsSource,            // options prop 类型
+  ImageSource,              // imageSource prop 类型
+  PointStyle,               // 点样式
+  BrushStyle,               // 笔刷样式
+  BrushLayerConfig,         // 图层配置
+  BrushStrokeData,          // 笔画数据
+  ToolType,                 // 'select' | 'point' | 'brush' | 'eraser'
+  ExportFormat,             // 导出格式
+  ExportOptions,            // 导出选项
+  ImportOptions,            // 导入选项
+  ExportData,               // 完整导出数据
+} from '@zzalai/leafer-point-annotation'
+
+// 运行时常量（value import）
+import {
+  DEFAULT_POINT_STYLE,
+  DEFAULT_BRUSH_STYLE,
+} from '@zzalai/leafer-point-annotation'
+```
+
+> 组件实例类型：`ref<InstanceType<typeof PointAnnotation> | null>(null)`
+
 ---
 
 ## 4. Events 事件速查
@@ -161,14 +199,14 @@ interface BrushLayerConfig {
 
 ### 5.1 点标注
 - `getPointAnnotations()` - 获取所有点
-- `createPointAnnotation(x, y, label?)` - 程序化加点
+- `createPointAnnotation(x, y, label?)` - ✨ 程序化加点（返回 `Promise<string | null>`；若配置 `beforeCreatePoint` 并返回 false，则返回 null 且不创建）
 - `removePointAnnotation(id)` - 程序化删点
 - `updatePointAnnotationLabel(id, label)` - 修改点的 label 文案
 
 ### 5.2 图片 & 画布
 - `getImageInfo()` - `{ url, width, height }`
 - `loadImage(url?)` - 动态加载新图片（不传参数时从 imageSource 读取）。切换图片会**自动清空**之前的点标注、笔刷、并重置 undo/redo 栈
-- `openFileDialog()` - 弹出浏览器本地文件选择框，内部自动调用 loadImage(dataURL)（父组件无需自行处理 FileReader）
+- `openFileDialog()` - ✨ 弹出浏览器本地文件选择框，组件内部自动调用 loadImage(dataURL)；父组件无需自行处理 `<input type="file">` 或 FileReader
 
 ### 5.3 工具切换
 - `getCurrentTool()` - `'select' | 'point' | 'brush' | 'eraser'`
@@ -276,6 +314,12 @@ leafer-point-annotation/
 | `pnpm preview` | 预览构建产物 |
 | `pnpm tsc --noEmit` | 类型检查 |
 
+### ✨ npm 发布优化说明
+- `package.json` 的 `files` 字段为 `["dist"]`，**仅发布 dist 目录**，不包含 src、project-docs 等源码/开发文档，减小包体积
+- 类型声明文件：`dist/index.d.ts`
+- 包入口：ESM: `dist/leafer-point-annotation.es.js`，UMD: `dist/leafer-point-annotation.umd.js`
+- CSS: `dist/leafer-point-annotation.css`（需使用者手动 `import`）
+
 ### 7.2 发布前检查清单
 - ✅ `pnpm build:all` 无错误
 - ✅ `dist/` 含完整产物（.es.js, .umd.js, .css, .d.ts）
@@ -357,6 +401,18 @@ git push
 
 ### Q7. 笔刷撤销的性能？
 - 对超大图片，单张 ImageData 快照约 4×W×H 字节，`maxUndoSteps` 不宜过大（默认 100）。
+
+### ✨ Q8. 我想在点标注创建前做业务判定？
+- 使用 `:before-create-point="yourCallback"` prop
+- 回调签名：`(x: number, y: number, normalizedX: number, normalizedY: number, existingPointCount: number) => boolean | Promise<boolean>`
+- 返回 false 或 Promise<false> 时提前终止创建（不写入数据、不进 undo 栈、不 emit）
+- 典型用途：数量限制（`count >= 5`）、区域限制（`nx < 0.5` 只允许右半部分）、异步确认（`window.confirm`）
+- 该回调仅在 `createPointAnnotation()` 内部执行一次，避免重复弹窗问题
+
+### ✨ Q9. 快捷键没反应？
+- 检查 `options.enableHotkeys` 是否为 `true`（默认 false，全部禁用）
+- 检查是否启用 `enableBrush`（笔刷快捷键 `b`、`e` 需 enableBrush）
+- 快捷键生效条件：画布 focus 或 hover 画布
 
 ---
 
