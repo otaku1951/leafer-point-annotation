@@ -301,7 +301,8 @@ annotationRef.value?.getMaskBlob()                // 导出当前图层 Blob（�
 | 方法 | 说明 |
 |------|------|
 | `getImageInfo()` | `{ url, width, height }` |
-| `loadImage(url: string)` | 动态加载一张新图片 |
+| `loadImage(url?: string)` | 动态加载一张新图片（不传参数时从 `imageSource` 读取）。切换图片时会**自动清空**之前的点标注、笔刷涂抹、并重置 undo/redo 栈 |
+| `openFileDialog()` | 弹出浏览器本地文件选择框，选图后内部自动调用 `loadImage(dataURL)`（父组件无需自行处理 FileReader） |
 
 ### 工具切换
 

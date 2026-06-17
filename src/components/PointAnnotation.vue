@@ -25,15 +25,17 @@
         <div class="loading-text">图片加载中</div>
       </div>
 
+      <!-- 隐藏的文件选择 input（始终存在于 DOM，供 openFileDialog 调用） -->
+      <input
+        ref="fileInputRef"
+        type="file"
+        accept="image/*"
+        style="display: none"
+        @change="handleFileUpload"
+      />
+
       <!-- 空状态/上传区域 -->
       <div v-if="loadStatus === 'idle'" class="upload-overlay" :class="{ 'drag-over': isDragOver }">
-        <input
-          ref="fileInputRef"
-          type="file"
-          accept="image/*"
-          style="display: none"
-          @change="handleFileUpload"
-        />
         <div class="upload-icon">
           <svg
             xmlns="http://www.w3.org/2000/svg"
@@ -612,6 +614,20 @@ const loadImage = async (imageSrc?: string | undefined) => {
   if (imageBox) {
     contentLayer.clear();
     imageBox.destroy();
+  }
+
+  // 重置点标注相关状态（切换图片时清空之前的标注）
+  // 注意：pointLayer 独立挂在 app.tree 上，不在 contentLayer 内，需单独清理
+  if (pointLayer && pointLayer.children) {
+    pointLayer.children.forEach((el: any) => el.destroy());
+    pointLayer.clear();
+  }
+  pointAnnotations.value = [];
+  pointCounter.value = 1;
+
+  // 重置撤销/重做栈（避免切换图片后旧操作仍可撤销）
+  if (commandManager) {
+    commandManager = new CommandManager(100);
   }
 
   loadStatus.value = "loading";
@@ -1870,6 +1886,8 @@ defineExpose({
   createBrushFromPoints,
   getBrushStyle: () => ({ ...localBrushStyle.value }),
   updateBrushStyle,
+  // 父组件可直接调用：弹出浏览器文件选择框，选择后自动加载到画布并重置标注
+  openFileDialog,
 });
 
 declare global {

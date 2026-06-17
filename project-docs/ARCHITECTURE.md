@@ -204,7 +204,8 @@ App (leafer-ui)
 | `updatePointAnnotationLabel(id, label)` | 修改某个点的 label 文案 |
 | **图片 & 画布** | |
 | `getImageInfo()` | 返回 `{ url, width, height }` |
-| `loadImage(url)` | 动态加载图片 |
+| `loadImage(url?)` | 动态加载图片（不传参数时从 imageSource 读取）。切换图片会**自动清空**之前的点标注、笔刷、并重置 undo/redo 栈 |
+| `openFileDialog()` | 弹出浏览器本地文件选择框，内部自动调用 loadImage(dataURL)（父组件无需自行处理 FileReader） |
 | **工具切换** | |
 | `getCurrentTool()` | 返回 `'select'/'point'/'brush'/'eraser'` |
 | `setTool(tool)` | 切到指定工具（受 enableBrush 限制） |

@@ -306,7 +306,8 @@ annotationRef.value?.getMaskBlob()                  // Export current layer as B
 | Method | Description |
 |--------|-------------|
 | `getImageInfo()` | `{ url, width, height }` |
-| `loadImage(url: string)` | Dynamically load a new image |
+| `loadImage(url?: string)` | Dynamically load a new image (reads from `imageSource` prop if no argument provided). Switching images **automatically clears** previous point annotations, brush strokes, and resets the undo/redo stack |
+| `openFileDialog()` | Opens the browser's local file picker. After selection, the component internally calls `loadImage(dataURL)` (parent component does NOT need to handle FileReader) |
 
 ### Tool Switching
 

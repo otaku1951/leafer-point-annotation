@@ -58,6 +58,7 @@
         <button @click="fetchPointData">Get Point Data</button>
         <button @click="exportData">Export Point Data</button>
         <button @click="refreshImage">Refresh Image</button>
+        <button @click="reselectLocalImage">🔄 Reselect Local Image (重置画布并重新上传)</button>
       </div>
       
       <div class="control-group">
@@ -530,6 +531,16 @@ const refreshImage = () => {
   if (pointAnnotation.value) {
     pointAnnotation.value.loadImage()
   }
+}
+
+// 重新选择本地图片（父组件触发 PointAnnotation 的文件选择框）
+// PointAnnotation 内部会自动：
+//   1. 弹出文件选择框
+//   2. FileReader 读取为 dataURL
+//   3. loadImage(dataURL)
+//   4. 销毁旧图片 + 清空旧标注 + 重建笔刷 + 重置 undo 栈
+const reselectLocalImage = () => {
+  pointAnnotation.value?.openFileDialog()
 }
 
 // 导出点数据
