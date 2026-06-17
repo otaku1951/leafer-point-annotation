@@ -297,32 +297,8 @@ import { tinykeys } from "tinykeys";
 import { PointAnnotationElement } from "@/elements/PointAnnotationElement";
 import { CanvasBrush } from "@/utils/CanvasBrush";
 import BrushStylePanel from "./BrushStylePanel.vue";
-import type { PointAnnotation, PointStyle, BrushStyle, BrushLayerConfig } from "@/types";
+import type { PointAnnotation, PointStyle, BrushStyle, BrushLayerConfig, ImageSource, OptionsSource } from "@/types";
 import { DEFAULT_POINT_STYLE, DEFAULT_BRUSH_STYLE } from "@/types";
-
-// Props
-export interface ImageSource {
-  id?: string;
-  url: string;
-}
-
-export interface OptionsSource {
-  pointStyle?: Partial<PointStyle>;
-  brushStyle?: Partial<BrushStyle>;
-  brushLayers?: BrushLayerConfig[];
-  maxBrushLayers?: number;
-  maxPoints?: number;
-  maxUndoSteps?: number;
-  maskExportFormat?: 'png' | 'jpeg' | 'jpg';
-  maskExportForeground?: 'black' | 'white';
-  showToolbar?: boolean;
-  showZoomController?: boolean;
-  canvasBackground?: string;
-  zoomMin?: number;
-  zoomMax?: number;
-  enableBrush?: boolean;
-  enableHotkeys?: boolean;
-}
 
 const props = defineProps({
   imageSource: {

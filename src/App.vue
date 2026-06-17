@@ -273,7 +273,7 @@
 <script setup lang="ts">
 import { ref, computed, watch } from 'vue'
 import PointAnnotation from './components/PointAnnotation.vue'
-import type { OptionsSource } from './components/PointAnnotation.vue'
+import type { OptionsSource } from './types'
 
 // 图片URL
 const imageUrl = ref('')

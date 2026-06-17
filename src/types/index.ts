@@ -1,3 +1,28 @@
+// 图片源配置
+export interface ImageSource {
+  id?: string;
+  url: string;
+}
+
+// 组件配置项（props.options 的类型）
+export interface OptionsSource {
+  pointStyle?: Partial<PointStyle>;
+  brushStyle?: Partial<BrushStyle>;
+  brushLayers?: BrushLayerConfig[];
+  maxBrushLayers?: number;
+  maxPoints?: number;
+  maxUndoSteps?: number;
+  maskExportFormat?: 'png' | 'jpeg' | 'jpg';
+  maskExportForeground?: 'black' | 'white';
+  showToolbar?: boolean;
+  showZoomController?: boolean;
+  canvasBackground?: string;
+  zoomMin?: number;
+  zoomMax?: number;
+  enableBrush?: boolean;
+  enableHotkeys?: boolean;  // 是否启用键盘快捷键（默认 false）
+}
+
 // 点标注数据结构
 export interface PointAnnotation {
   id: string;
