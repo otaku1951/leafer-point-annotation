@@ -335,6 +335,8 @@ Controlled layer switching. For example:
 | `redo-state-change` | `{ canRedo }` | Redo stack state changes |
 | `update:currentLayer` | `layerValue` | Current brush layer changes (use with v-model) |
 | `layer-change` | `layerValue` | Same as update:currentLayer |
+| `point-hover` | `(pointData, isHovering: boolean)` | Point hover state change: triggered when mouse enters/leaves a point |
+| `point-select` | `(pointData, isSelected: boolean)` | Point selection state change: triggered when a point is clicked to select/deselect |
 
 ---
 
@@ -418,6 +420,9 @@ annotationRef.value?.getMaskBlob()                  // Export current layer as B
 | `createPointAnnotation(x: number, y: number, label?: string): Promise<string \| null>` | Programmatically add a point (returns the new point id or null; returns null when `beforeCreatePoint` returns false) |
 | `removePointAnnotation(id: string): boolean` | Programmatically delete a point |
 | `updatePointAnnotationLabel(id: string, label: string): boolean` | Modify a point's label text |
+| `setPointHoverState(pointId: string, isHover: boolean): boolean` | Programmatically set hover style for a specific point (visual only; no event triggered; no loop) |
+| `setPointSelectState(pointId: string, isSelected: boolean): boolean` | Programmatically set the selection state for a specific point (updates editor's internal selection set via `app.editor.select`, keeps it consistent with point element style and `previousSelectedStates`; the `isExternalSelectSync` flag prevents bidirectional loop triggering of `point-select` events) |
+| `findPointBySequenceNumber(seq: number): { id: string; data: any } \| null` | Find a point by the number shown inside its circle (returns the point's id and full data; more reliable than id-based matching for cross-instance sync) |
 
 ### Image & Canvas
 
@@ -690,6 +695,147 @@ function handlePoints(points: any[]) {
 }
 </script>
 ```
+
+### Multi-Instance Bidirectional Linkage (A ↔ B Point Hover/Select Sync)
+
+When a page has two or more PointAnnotation instances, you can sync point hover/selection states across instances via the `point-hover` / `point-select` events + `setPointHoverState` / `setPointSelectState` APIs. We recommend matching by **sequenceNumber** (the number shown inside each point's circle) because it stays continuous regardless of deletions/undo/redo:
+
+```vue
+<template>
+  <div style="display: flex; gap: 20px">
+    <div style="flex: 1">
+      <h3>Instance A</h3>
+      <PointAnnotation
+        ref="refA"
+        :image-source="{ url: imageUrlA }"
+        @point-hover="(p, h) => onPointHover('A', p, h)"
+        @point-select="(p, s) => onPointSelect('A', p, s)"
+      />
+    </div>
+    <div style="flex: 1">
+      <h3>Instance B</h3>
+      <PointAnnotation
+        ref="refB"
+        :image-source="{ url: imageUrlB }"
+        @point-hover="(p, h) => onPointHover('B', p, h)"
+        @point-select="(p, s) => onPointSelect('B', p, s)"
+      />
+    </div>
+  </div>
+</template>
+
+<script setup lang="ts">
+import { ref } from 'vue'
+import PointAnnotation from '@zzalai/leafer-point-annotation'
+import '@zzalai/leafer-point-annotation/dist/leafer-point-annotation.css'
+
+const refA = ref<InstanceType<typeof PointAnnotation> | null>(null)
+const refB = ref<InstanceType<typeof PointAnnotation> | null>(null)
+const imageUrlA = '/demo-a.jpg'
+const imageUrlB = '/demo-b.jpg'
+
+function syncBySeq(targetRef: any, sourcePoint: any, apply: (pointId: string) => void) {
+  const target = targetRef.value?.findPointBySequenceNumber(sourcePoint.sequenceNumber);
+  if (target) apply(target.id);
+}
+
+function onPointHover(source: 'A' | 'B', pointData: any, isHover: boolean) {
+  const targetRef = source === 'A' ? refB : refA;
+  syncBySeq(targetRef, pointData, (targetId) => {
+    targetRef.value?.setPointHoverState(targetId, isHover);
+  });
+}
+
+function onPointSelect(source: 'A' | 'B', pointData: any, isSelected: boolean) {
+  const targetRef = source === 'A' ? refB : refA;
+  syncBySeq(targetRef, pointData, (targetId) => {
+    targetRef.value?.setPointSelectState(targetId, isSelected);
+  });
+}
+</script>
+```
+
+> **Matching rules**:
+> - Default matching uses `sequenceNumber` (the visible number 1, 2, 3... inside each point's circle), unaffected by deletions/undo/redo
+> - To match by `id` or other fields, replace the lookup logic in `syncBySeq`
+> - `setPointHoverState` is visual-only; `setPointSelectState` syncs the editor's internal selection set via `app.editor.select`; both use the `isExternalSelectSync` flag to avoid bidirectional loops
+
+### Deletion Linkage Best Practice (Recommended)
+
+It's not recommended to implement deletion linkage via `point-change` events (`sequenceNumber` gets renumbered after deletion, which can lead to incorrect deletions). Instead, use the following approach:
+
+```vue
+<template>
+  <div>
+    <!-- Hide toolbars for both instances and disable component hotkeys -->
+    <PointAnnotation
+      ref="refA"
+      :image-source="{ url: imageUrlA }"
+      :options="{ showToolbar: false, enableHotkeys: false }"
+      @point-hover="(p, h) => onPointHover('A', p, h)"
+      @point-select="(p, s) => onPointSelect('A', p, s)"
+    />
+    <PointAnnotation
+      ref="refB"
+      :image-source="{ url: imageUrlB }"
+      :options="{ showToolbar: false, enableHotkeys: false }"
+      @point-hover="(p, h) => onPointHover('B', p, h)"
+      @point-select="(p, s) => onPointSelect('B', p, s)"
+    />
+    <!-- Parent component unified delete button -->
+    <button @click="deleteSelectedBoth">🗑 Delete Selected</button>
+  </div>
+</template>
+
+<script setup lang="ts">
+import { ref, onMounted, onUnmounted } from 'vue'
+import PointAnnotation from '@zzalai/leafer-point-annotation'
+import '@zzalai/leafer-point-annotation/dist/leafer-point-annotation.css'
+
+const refA = ref<InstanceType<typeof PointAnnotation> | null>(null)
+const refB = ref<InstanceType<typeof PointAnnotation> | null>(null)
+
+// Bidirectional hover sync
+function onPointHover(source: 'A' | 'B', pointData: any, isHover: boolean) {
+  const targetRef = source === 'A' ? refB : refA
+  const target = targetRef.value?.findPointBySequenceNumber(pointData.sequenceNumber)
+  if (target) targetRef.value?.setPointHoverState(target.id, isHover)
+}
+
+// Bidirectional selection sync
+function onPointSelect(source: 'A' | 'B', pointData: any, isSelected: boolean) {
+  const targetRef = source === 'A' ? refB : refA
+  const target = targetRef.value?.findPointBySequenceNumber(pointData.sequenceNumber)
+  if (target) targetRef.value?.setPointSelectState(target.id, isSelected)
+}
+
+// Unified deletion: since hover/selected states are already synced,
+// just call deleteSelected() on both instances
+const deleteSelectedBoth = () => {
+  refA.value?.deleteSelected()
+  refB.value?.deleteSelected()
+}
+
+// In multi-instance mode: parent listens for Delete key to trigger unified deletion
+const onAppKeyDown = (e: KeyboardEvent) => {
+  const target = e.target as HTMLElement
+  if (target && (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA')) return
+  if (e.code === 'Delete' || e.key === 'Delete') {
+    e.preventDefault()
+    deleteSelectedBoth()
+  }
+}
+
+onMounted(() => { window.addEventListener('keydown', onAppKeyDown) })
+onUnmounted(() => { window.removeEventListener('keydown', onAppKeyDown) })
+</script>
+```
+
+> **Why this approach is recommended**:
+> - Hover/selected states are bidirectionally synced via `point-hover` / `point-select` events, ensuring the same points are selected on both sides
+> - Deletion is handled by the parent component, directly calling `deleteSelected()` on both instances — no reliance on `sequenceNumber` or `id` matching
+> - Unaffected by post-deletion renumbering, making it more reliable and simpler
+> - `showToolbar: false` hides built-in toolbars, `enableHotkeys: false` disables component internal shortcuts, preventing the Delete key from triggering deletion twice
 
 ---
 

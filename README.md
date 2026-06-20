@@ -330,6 +330,8 @@ async function beforeCreatePoint(x: number, y: number, nx: number, ny: number, c
 | `redo-state-change` | `{ canRedo }` | 重做栈状态变化 |
 | `update:currentLayer` | `layerValue` | 当前笔刷图层变化（配合 v-model） |
 | `layer-change` | `layerValue` | 同 update:currentLayer |
+| `point-hover` | `(pointData, isHovering: boolean)` | 点 hover 状态变化：鼠标移入/移出某点时触发 |
+| `point-select` | `(pointData, isSelected: boolean)` | 点选中状态变化：点击选中/取消选中某点时触发 |
 
 ---
 
@@ -413,6 +415,9 @@ annotationRef.value?.getMaskBlob()                // 导出当前图层 Blob（�
 | `createPointAnnotation(x: number, y: number, label?: string): Promise<string \| null>` | 程序化新增一个点（返回新点 id 或 null；若配置了 `beforeCreatePoint` 并返回 false 则返回 null） |
 | `removePointAnnotation(id: string): boolean` | 程序化删除一个点 |
 | `updatePointAnnotationLabel(id: string, label: string): boolean` | 修改某个点的 label |
+| `setPointHoverState(pointId: string, isHover: boolean): boolean` | 编程式设置某个点的 hover 样式（仅修改视觉，不触发事件，不会形成双向循环） |
+| `setPointSelectState(pointId: string, isSelected: boolean): boolean` | 编程式设置某个点的选中状态（通过 `app.editor.select` 更新 editor 内部选中集，与点元素样式和 `previousSelectedStates` 保持一致；`isExternalSelectSync` 标志防止双向循环触发 `point-select` 事件） |
+| `findPointBySequenceNumber(seq: number): { id: string; data: any } \| null` | 按圆圈内显示的数字序号查找点，返回该点的 id 和完整数据（父组件跨实例联动时，按视觉序号匹配更可靠） |
 
 ### 图片 & 画布
 
@@ -685,6 +690,149 @@ function handlePoints(points: any[]) {
 }
 </script>
 ```
+
+### 多实例双向联动（A ↔ B 点 hover/选中同步）
+
+当页面上有两个或多个 PointAnnotation 实例时，可通过 `point-hover` / `point-select` 事件 + `setPointHoverState` / `setPointSelectState` API 实现跨实例的点状态联动。推荐按 **sequenceNumber**（圆圈内显示的数字序号）匹配，因为它始终连续，不受删除/undo/redo 影响：
+
+```vue
+<template>
+  <div style="display: flex; gap: 20px">
+    <div style="flex: 1">
+      <h3>实例 A</h3>
+      <PointAnnotation
+        ref="refA"
+        :image-source="{ url: imageUrlA }"
+        @point-hover="(p, h) => onPointHover('A', p, h)"
+        @point-select="(p, s) => onPointSelect('A', p, s)"
+      />
+    </div>
+    <div style="flex: 1">
+      <h3>实例 B</h3>
+      <PointAnnotation
+        ref="refB"
+        :image-source="{ url: imageUrlB }"
+        @point-hover="(p, h) => onPointHover('B', p, h)"
+        @point-select="(p, s) => onPointSelect('B', p, s)"
+      />
+    </div>
+  </div>
+</template>
+
+<script setup lang="ts">
+import { ref } from 'vue'
+import PointAnnotation from '@zzalai/leafer-point-annotation'
+import '@zzalai/leafer-point-annotation/dist/leafer-point-annotation.css'
+
+const refA = ref<InstanceType<typeof PointAnnotation> | null>(null)
+const refB = ref<InstanceType<typeof PointAnnotation> | null>(null)
+const imageUrlA = '/demo-a.jpg'
+const imageUrlB = '/demo-b.jpg'
+
+// 按 sequenceNumber（圆圈显示的数字序号）在目标实例中找到对应点
+function syncBySeq(targetRef: any, sourcePoint: any, apply: (pointId: string) => void) {
+  const target = targetRef.value?.findPointBySequenceNumber(sourcePoint.sequenceNumber);
+  if (target) apply(target.id);
+}
+
+// hover 双向同步
+function onPointHover(source: 'A' | 'B', pointData: any, isHover: boolean) {
+  const targetRef = source === 'A' ? refB : refA;
+  syncBySeq(targetRef, pointData, (targetId) => {
+    targetRef.value?.setPointHoverState(targetId, isHover);
+  });
+}
+
+// 选中状态双向同步
+function onPointSelect(source: 'A' | 'B', pointData: any, isSelected: boolean) {
+  const targetRef = source === 'A' ? refB : refA;
+  syncBySeq(targetRef, pointData, (targetId) => {
+    targetRef.value?.setPointSelectState(targetId, isSelected);
+  });
+}
+</script>
+```
+
+> **匹配规则说明**：
+> - 默认按 `sequenceNumber`（圆圈内显示的数字 1、2、3…）匹配，不受删除/undo/redo 影响
+> - 如需按 `id` 或其他字段匹配，只需替换 `syncBySeq` 中的查找逻辑
+> - `setPointHoverState` 是纯样式修改；`setPointSelectState` 通过 `app.editor.select` 同步 editor 内部选中集，二者均通过 `isExternalSelectSync` 标志避免双向循环
+
+### 删除联动最佳实践（推荐方案）
+
+不建议基于 `point-change` 事件做删除匹配（`sequenceNumber` 在删除后会重排，容易删错），推荐以下方案：
+
+```vue
+<template>
+  <div>
+    <!-- 双实例均隐藏工具栏 + 禁用组件内部快捷键 -->
+    <PointAnnotation
+      ref="refA"
+      :image-source="{ url: imageUrlA }"
+      :options="{ showToolbar: false, enableHotkeys: false }"
+      @point-hover="(p, h) => onPointHover('A', p, h)"
+      @point-select="(p, s) => onPointSelect('A', p, s)"
+    />
+    <PointAnnotation
+      ref="refB"
+      :image-source="{ url: imageUrlB }"
+      :options="{ showToolbar: false, enableHotkeys: false }"
+      @point-hover="(p, h) => onPointHover('B', p, h)"
+      @point-select="(p, s) => onPointSelect('B', p, s)"
+    />
+    <!-- 父组件统一删除按钮 -->
+    <button @click="deleteSelectedBoth">🗑 删除选中</button>
+  </div>
+</template>
+
+<script setup lang="ts">
+import { ref, onMounted, onUnmounted } from 'vue'
+import PointAnnotation from '@zzalai/leafer-point-annotation'
+import '@zzalai/leafer-point-annotation/dist/leafer-point-annotation.css'
+
+const refA = ref<InstanceType<typeof PointAnnotation> | null>(null)
+const refB = ref<InstanceType<typeof PointAnnotation> | null>(null)
+
+// hover 双向同步
+function onPointHover(source: 'A' | 'B', pointData: any, isHover: boolean) {
+  const targetRef = source === 'A' ? refB : refA
+  const target = targetRef.value?.findPointBySequenceNumber(pointData.sequenceNumber)
+  if (target) targetRef.value?.setPointHoverState(target.id, isHover)
+}
+
+// 选中状态双向同步
+function onPointSelect(source: 'A' | 'B', pointData: any, isSelected: boolean) {
+  const targetRef = source === 'A' ? refB : refA
+  const target = targetRef.value?.findPointBySequenceNumber(pointData.sequenceNumber)
+  if (target) targetRef.value?.setPointSelectState(target.id, isSelected)
+}
+
+// 统一删除：两端选中状态已经联动同步，分别调用 deleteSelected() 即可
+const deleteSelectedBoth = () => {
+  refA.value?.deleteSelected()
+  refB.value?.deleteSelected()
+}
+
+// 双实例模式下：父组件监听 Delete 键，统一触发删除
+const onAppKeyDown = (e: KeyboardEvent) => {
+  const target = e.target as HTMLElement
+  if (target && (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA')) return
+  if (e.code === 'Delete' || e.key === 'Delete') {
+    e.preventDefault()
+    deleteSelectedBoth()
+  }
+}
+
+onMounted(() => { window.addEventListener('keydown', onAppKeyDown) })
+onUnmounted(() => { window.removeEventListener('keydown', onAppKeyDown) })
+</script>
+```
+
+> **为什么推荐此方案**：
+> - hover/selected 状态通过 `point-hover` / `point-select` 事件双向同步，保证两端选中的点始终一致
+> - 删除操作由父组件统一执行，直接调用两个实例的 `deleteSelected()`，不依赖 `sequenceNumber` 或 `id` 匹配
+> - 不受删除后重排的影响，更可靠、更简单
+> - `showToolbar: false` 隐藏内置工具栏，`enableHotkeys: false` 禁用组件内部快捷键，避免 Delete 键触发两次删除
 
 ---
 

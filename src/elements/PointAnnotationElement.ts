@@ -250,4 +250,23 @@ export class PointAnnotationElement extends Group {
       }
     }
   }
+
+  public setHoverState(isHover: boolean): void {
+    if (isHover) {
+      this.circle.set({
+        fill: this.style.selectedCircleFill,
+        stroke: this.style.selectedCircleStroke,
+      });
+    } else {
+      if (this._isSelected) return;
+      this.circle.set({
+        fill: this.style.circleFill,
+        stroke: this.style.circleStroke,
+      });
+    }
+  }
+
+  public getIsSelected(): boolean {
+    return this._isSelected;
+  }
 }

@@ -192,6 +192,8 @@ import {
 | `redo-state-change` | `{ canRedo }` | 重做栈状态变化 |
 | `update:currentLayer` | `layerValue` | 当前笔刷图层变化（配合 v-model） |
 | `layer-change` | `layerValue` | 同 update:currentLayer |
+| `point-hover` | `(pointData, isHovering: boolean)` | 点 hover 状态变化（鼠标移入/移出） |
+| `point-select` | `(pointData, isSelected: boolean)` | 点选中状态变化（点击选中/取消选中） |
 
 ---
 
@@ -202,6 +204,9 @@ import {
 - `createPointAnnotation(x, y, label?)` - ✨ 程序化加点（返回 `Promise<string | null>`；若配置 `beforeCreatePoint` 并返回 false，则返回 null 且不创建）
 - `removePointAnnotation(id)` - 程序化删点
 - `updatePointAnnotationLabel(id, label)` - 修改点的 label 文案
+- `setPointHoverState(pointId, isHover)` - 编程式设置某点的 hover 样式（仅修改视觉，不触发事件，不会形成双向循环）
+- `setPointSelectState(pointId, isSelected)` - 编程式设置某点的选中状态（通过 `app.editor.select` 更新 editor 内部选中集，与点元素样式和 `previousSelectedStates` 保持一致；`isExternalSelectSync` 标志防止双向循环触发 `point-select` 事件）
+- `findPointBySequenceNumber(seq)` - 按圆圈内显示的数字序号查找点，返回 `{ id, data }` 或 null（跨实例联动时，按视觉序号匹配更可靠）
 
 ### 5.2 图片 & 画布
 - `getImageInfo()` - `{ url, width, height }`

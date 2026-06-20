@@ -10,6 +10,8 @@
         v-model:currentLayer="activeLayer"
         :before-create-point="useBeforeCreatePoint ? beforeCreatePoint : undefined"
         @pointChange="handlePointChange"
+        @point-hover="(p, h) => onPointHover('A', p, h)"
+        @point-select="(p, s) => onPointSelect('A', p, s)"
         @loadStart="handleLoadStart"
         @loadSuccess="handleLoadSuccess"
         @loadError="handleLoadError"
@@ -21,6 +23,8 @@
         :imageSource="imageSource2" 
         :options="editorOptions2"
         @pointChange="handlePointChange2"
+        @point-hover="(p, h) => onPointHover('B', p, h)"
+        @point-select="(p, s) => onPointSelect('B', p, s)"
       />
     </div>
     
@@ -112,7 +116,7 @@
         <div class="multi-layer-row">
           <button @click="pointAnnotation?.undo()">↶ 撤销</button>
           <button @click="pointAnnotation?.redo()">↷ 重做</button>
-          <button @click="pointAnnotation?.deleteSelected()">🗑 删除当前</button>
+          <button @click="deleteSelectedBoth">🗑 删除选中</button>
           <button @click="pointAnnotation?.clearAllAnnotationsAndBrush()">⚠ 清除全部</button>
         </div>
       </div>
@@ -273,7 +277,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, watch } from 'vue'
+import { ref, computed, watch, onMounted, onUnmounted } from 'vue'
 import PointAnnotation from './components/PointAnnotation.vue'
 import type { OptionsSource } from './types'
 
@@ -347,7 +351,7 @@ const editorOptions2 = computed<OptionsSource>(() => {
       opacity: 0.55,
       size: 100
     },
-    showToolbar: true,
+    showToolbar: showToolbar.value,
     showZoomController: true,
     enableBrush: enableBrush.value,
     enableHotkeys: false
@@ -357,6 +361,68 @@ const editorOptions2 = computed<OptionsSource>(() => {
 const handlePointChange2 = (points: any[]) => {
   console.log('Editor 2 - Points changed:', points)
 }
+
+// =============================================================
+// 双向联动：两个 PointAnnotation 实例之间
+// - hover 联动（onPointHover）
+// - 选中状态联动（onPointSelect）
+//
+// 匹配规则：按 sequenceNumber（圆圈内序号）匹配
+// 语义：A 上第 N 个点 ↔ B 上第 N 个点
+// 新增点不做联动；删除由父组件统一执行 deleteSelectedBoth()
+// =============================================================
+
+// hover 双向同步（按 sequenceNumber 匹配）
+const onPointHover = (source: 'A' | 'B', pointData: any, isHover: boolean) => {
+  if (!enableMultiInstance.value) return
+  const targetRef = source === 'A' ? pointAnnotation2 : pointAnnotation
+  if (!targetRef.value) return
+  const target = targetRef.value.findPointBySequenceNumber(pointData.sequenceNumber)
+  if (target) {
+    targetRef.value.setPointHoverState(target.id, isHover)
+  }
+}
+
+// 选中状态双向同步（按 sequenceNumber 匹配）
+const onPointSelect = (source: 'A' | 'B', pointData: any, isSelected: boolean) => {
+  if (!enableMultiInstance.value) return
+  const targetRef = source === 'A' ? pointAnnotation2 : pointAnnotation
+  if (!targetRef.value) return
+  const target = targetRef.value.findPointBySequenceNumber(pointData.sequenceNumber)
+  if (target) {
+    targetRef.value.setPointSelectState(target.id, isSelected)
+  }
+}
+
+// === 双实例删除：父组件统一执行 ===
+// 由于 hover/选中状态已经双向联动（两端选中的点一致），
+// 直接分别调用两个实例的 deleteSelected() 即可保持删除一致。
+// 不再依赖 pointChange 事件做删除匹配，避免 renumber 造成的删错问题。
+const deleteSelectedBoth = () => {
+  pointAnnotation.value?.deleteSelected()
+  if (enableMultiInstance.value) {
+    pointAnnotation2.value?.deleteSelected()
+  }
+}
+
+// 双实例模式下：父组件监听 Delete 键，统一删除两个实例的选中标注
+const onAppKeyDown = (e: KeyboardEvent) => {
+  if (!enableMultiInstance.value) return
+  const target = e.target as HTMLElement
+  if (target && (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA')) return
+  if (e.code === 'Delete' || e.key === 'Delete') {
+    e.preventDefault()
+    deleteSelectedBoth()
+  }
+}
+
+onMounted(() => {
+  window.addEventListener('keydown', onAppKeyDown)
+})
+
+onUnmounted(() => {
+  window.removeEventListener('keydown', onAppKeyDown)
+})
 
 const editorOptions = computed<OptionsSource>(() => {
   if (useMultiLayer.value) {
@@ -389,6 +455,7 @@ const editorOptions = computed<OptionsSource>(() => {
 const loadStatus = ref('idle')
 const pointData = ref('')
 const pointAnnotation = ref<InstanceType<typeof PointAnnotation> | null>(null)
+const pointAnnotation2 = ref<InstanceType<typeof PointAnnotation> | null>(null)
 // 点标注列表（用于父组件修改 label 的 demo）
 const pointsData = ref<any[]>([])
 const maskFormat = ref<'png' | 'jpeg'>('png')
@@ -445,7 +512,8 @@ const handleLayerChange = (layer: string) => {
 // 处理点变化
 const handlePointChange = (data: any) => {
   pointData.value = JSON.stringify(data, null, 2)
-  pointsData.value = Array.isArray(data) ? [...data] : []
+  const arr = Array.isArray(data) ? [...data] : []
+  pointsData.value = arr
 }
 
 // 父组件修改某个标注点的 label（demo）

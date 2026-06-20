@@ -334,6 +334,8 @@ const emit = defineEmits([
   "redoStateChange",
   "update:currentLayer",
   "layerChange",
+  "point-hover",
+  "point-select",
 ]);
 
 const canvasContainer = ref<HTMLElement | undefined>(undefined);
@@ -1493,21 +1495,31 @@ const handleCanvasTap = async (e: any) => {
 // }
 
 // 处理点击【标注点】选中样式
+const previousSelectedStates = new Map<string, boolean>();
+// 🔒 外部联动时设置的锁：防止 SELECT 事件回调中再次 emit point-select 造成循环
+let isExternalSelectSync = false;
+
 const handlePointAnnotationSelected = (e: any) => {
   if (currentTool.value === 'brush' || currentTool.value === 'eraser' || !app || !imageBox) return;
 
-  // 收集新选中的所有点的 id（可能是单个，也可能是数组）
   const selectedIds = new Set<string>();
   const newValues = Array.isArray(e.value) ? e.value : (e.value ? [e.value] : []);
   newValues.forEach((element: any) => {
     if (element.data?.id) selectedIds.add(element.data.id);
   });
 
-  // 遍历所有标注点，逐个设置状态
   pointLayer.children.forEach((p: any) => {
     if (p._element_tag !== 'point-annotation') return;
-    const isSelected = selectedIds.has(p.data?.id);
+    const id = p.data?.id;
+    const isSelected = selectedIds.has(id);
+    const wasSelected = previousSelectedStates.get(id) ?? false;
     p.handlePointAnnotationSelected?.(isSelected);
+    if (isSelected !== wasSelected) {
+      previousSelectedStates.set(id, isSelected);
+      if (!isExternalSelectSync) {
+        emit("point-select", { ...p.data }, isSelected);
+      }
+    }
   });
 };
 
@@ -1551,6 +1563,13 @@ const createPointAnnotation = async (pixelX: number, pixelY: number): Promise<st
 
   // 创建点标注元素
   const pointElement = new PointAnnotationElement(pointData, pointStyle.value);
+
+  pointElement.on(PointerEvent.ENTER, () => {
+    emit("point-hover", { ...pointElement.data }, true);
+  });
+  pointElement.on(PointerEvent.LEAVE, () => {
+    emit("point-hover", { ...pointElement.data }, false);
+  });
 
   // 根据当前工具设置标签的可编辑状态
   // 注意：由于 PointAnnotationElement.hitChildren = false，子元素无法接收鼠标事件，
@@ -1820,6 +1839,72 @@ const removePointAnnotation = (id: string): boolean => {
   return true;
 };
 
+const findPointElement = (pointId: string): PointAnnotationElement | null => {
+  if (!pointLayer || !pointLayer.children) return null;
+  for (const el of pointLayer.children as any[]) {
+    if (el?._element_tag === 'point-annotation' && el.data?.id === pointId) {
+      return el as PointAnnotationElement;
+    }
+  }
+  return null;
+};
+
+const findPointBySequenceNumber = (seq: number): { id: string; data: any } | null => {
+  if (!pointLayer || !pointLayer.children) return null;
+  for (const el of pointLayer.children as any[]) {
+    if (el?._element_tag === 'point-annotation' && el.data?.sequenceNumber === seq) {
+      return { id: el.data.id, data: { ...el.data } };
+    }
+  }
+  return null;
+};
+
+const setPointHoverState = (pointId: string, isHover: boolean): boolean => {
+  const element = findPointElement(pointId);
+  if (!element) return false;
+  element.setHoverState(isHover);
+  return true;
+};
+
+// 设置点的选中状态（通过 editor API，确保 editor 内部选中集与 previousSelectedStates 一致）
+// 为什么通过 editor API？—— 如果只改点元素样式和 previousSelectedStates，
+// 下次 editor 触发 SELECT 事件时，判断逻辑会错乱（状态不同步）。
+const setPointSelectState = (pointId: string, isSelected: boolean): boolean => {
+  const element = findPointElement(pointId);
+  if (!element || !app?.editor) return false;
+
+  const currentList = app.editor.list || [];
+  const isInList = currentList.some((el: any) => el.data?.id === pointId);
+
+  // 已经是目标状态，无需操作
+  if (isSelected === isInList) return true;
+
+  // 上锁：SELECT 事件回调中检测到此标志时不 emit point-select，防止循环联动
+  isExternalSelectSync = true;
+  try {
+    if (isSelected) {
+      // ✅ 替换模式：只选中目标点，清除其他所有选中
+      // 符合编辑器默认交互语义（点击一个点 = 只选中这个点）
+      app.editor.select(element);
+    } else {
+      // 排除模式：从当前选中中移除目标点
+      const remaining = currentList.filter((el: any) => el.data?.id !== pointId);
+      if (remaining.length === 0) {
+        app.editor.cancel();
+      } else {
+        try {
+          (app.editor as any).select(remaining);
+        } catch {
+          app.editor.select(remaining[0]);
+        }
+      }
+    }
+  } finally {
+    setTimeout(() => { isExternalSelectSync = false; }, 0);
+  }
+  return true;
+};
+
 const zoomOut = () => {
   if (!app) return;
   app.tree.zoom("out");
@@ -1885,6 +1970,10 @@ defineExpose({
   updateBrushStyle,
   // 父组件可直接调用：弹出浏览器文件选择框，选择后自动加载到画布并重置标注
   openFileDialog,
+  // 点标注双向联动能力
+  setPointHoverState,
+  setPointSelectState,
+  findPointBySequenceNumber,
 });
 
 declare global {
