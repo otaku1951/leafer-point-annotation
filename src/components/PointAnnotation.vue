@@ -1666,9 +1666,14 @@ const deleteSelected = () => {
   emit("pointChange", [...pointAnnotations.value]);
 };
 
-// 清除所有标注和笔刷
-const clearAllAnnotationsAndBrush = () => {
-  // 清除所有点标注
+// 清除所有标注点（不动笔刷）
+const clearAllAnnotations = () => {
+  if (pointAnnotations.value.length === 0) return;
+
+  // 取消当前 editor 选中，避免 editor 内部持有已删除元素引用
+  if (app) app.editor.cancel();
+
+  // 从图层移除所有点元素并销毁
   pointAnnotations.value.forEach((p: any) => {
     const element = pointLayer.children.find((el: any) => el.data?.id === p.id);
     if (element) {
@@ -1678,12 +1683,21 @@ const clearAllAnnotationsAndBrush = () => {
   });
   pointAnnotations.value = [];
 
+  // 清除选中状态追踪
+  previousSelectedStates.clear();
+
+  emit("pointChange", []);
+};
+
+// 清除所有标注和笔刷
+const clearAllAnnotationsAndBrush = () => {
+  // 先清除所有点标注
+  clearAllAnnotations();
+
   // 清除所有图层的笔刷（仅当启用笔刷时）
   if (effectiveEnableBrush.value) {
     Object.values(canvasBrushesByLayer.value).forEach(brush => brush.clear());
   }
-
-  emit("pointChange", []);
 };
 
 // 清除当前图层的笔刷内容（仅当启用笔刷时）
@@ -1946,6 +1960,7 @@ defineExpose({
   loadImage,
   clearBrush,
   clearAllBrushLayers,
+  clearAllAnnotations,
   clearAllAnnotationsAndBrush,
   zoomIn,
   zoomOut,

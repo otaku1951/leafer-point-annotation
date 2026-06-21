@@ -448,6 +448,7 @@ annotationRef.value?.getMaskBlob()                  // Export current layer as B
 | Method | Description |
 |--------|-------------|
 | `deleteSelected()` | Delete currently selected point (with confirm dialog) |
+| `clearAllAnnotations()` | Clear all annotation points (leaves brush untouched) |
 | `clearAllAnnotationsAndBrush()` | Clear all points + brush (with confirm dialog) |
 | `clearBrush()` | Clear current layer's brush |
 | `clearAllBrushLayers()` | Clear all layers' brush |

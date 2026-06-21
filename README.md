@@ -443,6 +443,7 @@ annotationRef.value?.getMaskBlob()                // 导出当前图层 Blob（�
 | 方法 | 说明 |
 |------|------|
 | `deleteSelected()` | 删除当前选中的点（带 `confirm`） |
+| `clearAllAnnotations()` | 清除所有标注点（不动笔刷） |
 | `clearAllAnnotationsAndBrush()` | 清空所有点 + 笔刷（带 `confirm`） |
 | `clearBrush()` | 清空当前图层的笔刷 |
 | `clearAllBrushLayers()` | 清空所有图层的笔刷 |

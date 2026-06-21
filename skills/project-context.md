@@ -220,6 +220,7 @@ import {
 
 ### 5.4 删除 & 清空
 - `deleteSelected()` - 删除选中点（带确认）
+- `clearAllAnnotations()` - 清除所有标注点（不动笔刷）
 - `clearAllAnnotationsAndBrush()` - 清空所有点+笔刷（带确认）
 - `clearBrush()` - 清空当前图层笔刷
 - `clearAllBrushLayers()` - 清空所有图层笔刷
