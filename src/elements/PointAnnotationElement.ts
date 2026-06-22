@@ -133,17 +133,19 @@ export class PointAnnotationElement extends Group {
   private bindEvents(): void {
     this.on(PointerEvent.ENTER, () => {
       this.circle.set({
-        fill: this.style.selectedCircleFill,
-        stroke: this.style.selectedCircleStroke,
+        fill: this.style.hoverCircleFill,
+        stroke: this.style.hoverCircleStroke,
       })
       // this.label.editable = true;
     })
     this.on(PointerEvent.LEAVE, () => {
-      if (this._isSelected) return
-      this.circle.set({
-        fill: this.style.circleFill,
-        stroke: this.style.circleStroke,
-      })
+      if (this._isSelected) {
+        // 选中状态：保持选中样式（覆盖可能的 hover 样式）
+        this.circle.set({ fill: this.style.selectedCircleFill, stroke: this.style.selectedCircleStroke })
+      } else {
+        // 未选中状态：恢复正常样式
+        this.circle.set({ fill: this.style.circleFill, stroke: this.style.circleStroke })
+      }
       // this.label.editable = true;
     })
     // Hover 效果已通过 hoverStyle 配置，无需监听事件
@@ -254,15 +256,22 @@ export class PointAnnotationElement extends Group {
   public setHoverState(isHover: boolean): void {
     if (isHover) {
       this.circle.set({
-        fill: this.style.selectedCircleFill,
-        stroke: this.style.selectedCircleStroke,
+        fill: this.style.hoverCircleFill,
+        stroke: this.style.hoverCircleStroke,
       });
     } else {
-      if (this._isSelected) return;
-      this.circle.set({
-        fill: this.style.circleFill,
-        stroke: this.style.circleStroke,
-      });
+      // if (this._isSelected) return;
+      // this.circle.set({
+      //   fill: this.style.circleFill,
+      //   stroke: this.style.circleStroke,
+      // });
+      if (this._isSelected) {
+        // 选中状态：保持选中样式（覆盖可能的 hover 样式）
+        this.circle.set({ fill: this.style.selectedCircleFill, stroke: this.style.selectedCircleStroke })
+      } else {
+        // 未选中状态：恢复正常样式
+        this.circle.set({ fill: this.style.circleFill, stroke: this.style.circleStroke })
+      }
     }
   }
 

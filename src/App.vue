@@ -343,6 +343,8 @@ const editorOptions2 = computed<OptionsSource>(() => {
     pointStyle: {
       circleFill: '#00ff00',
       circleStroke: '#fff',
+      hoverCircleFill: '#665533',
+      hoverCircleStroke: '#fff',
       selectedCircleFill: '#ff0',
       selectedCircleStroke: '#000'
     },
