@@ -1068,7 +1068,10 @@ const importCanvasJSON = async (
 
     if (data.pointAnnotations && Array.isArray(data.pointAnnotations)) {
       for (const pointData of data.pointAnnotations) {
-        const pointElement = new PointAnnotationElement(pointData, pointStyle.value);
+        const pointElement = new PointAnnotationElement(pointData, pointStyle.value, () => {
+          emit("pointChange", [...pointAnnotations.value]);
+        });
+        pointElement.setImageSize(imageWidth.value || 1, imageHeight.value || 1);
         if (currentTool.value === 'brush' || currentTool.value === 'eraser') {
           pointElement.label.editable = false;
         }
@@ -1789,7 +1792,10 @@ const createPointAnnotation = async (pixelX: number, pixelY: number): Promise<st
   };
 
   // 创建点标注元素
-  const pointElement = new PointAnnotationElement(pointData, pointStyle.value);
+  const pointElement = new PointAnnotationElement(pointData, pointStyle.value, () => {
+    emit("pointChange", [...pointAnnotations.value]);
+  });
+  pointElement.setImageSize(imageWidth.value || 1, imageHeight.value || 1);
 
   pointElement.on(PointerEvent.ENTER, () => {
     emit("point-hover", { ...pointElement.data }, true);

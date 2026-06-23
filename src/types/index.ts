@@ -61,6 +61,8 @@ export interface PointStyle {
   labelBackgroundColor: string;
   labelTextColor: string;
   labelFontSize: number;
+  labelFontFamily: string;
+  labelFill: string;
   labelPadding: number | number[];
   fixedSizeOnZoom?: boolean;      // 是否开启标注点固定大小（不随画布缩放）
   fixedSizeScale?: number;        // 固定大小的缩放系数（默认为1）
@@ -151,6 +153,8 @@ export const DEFAULT_POINT_STYLE: PointStyle = {
   labelBackgroundColor: '#ffffff',
   labelTextColor: '#333333',
   labelFontSize: 16,
+  labelFontFamily: '"Open Sans", Tahoma, Consolas, monospace, sans-serif, Roboto',
+  labelFill: '#333333',
   labelPadding: [2,4],
   fixedSizeOnZoom: false,    // 默认关闭固定大小功能
   fixedSizeScale: 1,         // 默认缩放系数为1
