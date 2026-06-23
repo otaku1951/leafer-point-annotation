@@ -156,6 +156,10 @@ interface OptionsSource {
                                             // brushTool/eraserTool/mask 导出等方法失效
   enableHotkeys?: boolean                   // 是否启用键盘快捷键（默认 false）；
                                             // true 时才绑定 v/p/b/e/Ctrl+Z 等快捷键
+  brushCursorEnabled?: boolean             // 是否显示笔刷/橡皮擦的自定义跟随光标（默认 true）；
+                                            // 切换到 brush/eraser 工具时光标显示为笔刷形状（颜色、大小、透明度实时同步）
+  loadingGradientColors?: [string, string]  // 加载中渐变动画的两个颜色（默认：淡紫 '#f0edff' -> 淡蓝 '#e6f0ff'）
+  loadingTextColor?: string                // 加载中文字颜色（默认：'#4a5568'，蓝灰色，明显且不违和）
 
   // ============ UI 开关 ============
   showToolbar?: boolean                     // 是否显示内置工具栏（默认 true）
@@ -324,7 +328,7 @@ async function beforeCreatePoint(x: number, y: number, nx: number, ny: number, c
 |------|------|---------|
 | `point-change` | `(points: PointAnnotation[])` | 点新增 / 删除 / 修改 / 重排 |
 | `load-start` | - | 开始加载图片 |
-| `load-success` | `{ url, width, height }` | 图片加载成功 |
+| `load-success` | `{ url, width, height, isLocal, file? }` | 图片加载成功（本地图片时 `isLocal=true`，`file` 为原始 `File` 对象，可直接用于后端 multipart 上传） |
 | `load-error` | `{ error }` | 图片加载失败 |
 | `undo-state-change` | `{ canUndo }` | 撤销栈状态变化 |
 | `redo-state-change` | `{ canRedo }` | 重做栈状态变化 |
@@ -423,7 +427,7 @@ annotationRef.value?.getMaskBlob()                // 导出当前图层 Blob（�
 
 | 方法 | 说明 |
 |------|------|
-| `getImageInfo()` | `{ url, width, height }` |
+| `getImageInfo()` | `{ url, width, height, isLocal, file? }`（本地选图时有 `file` 原始 `File` 对象） |
 | `loadImage(url?: string)` | 动态加载一张新图片（不传参数时从 `imageSource` 读取）。切换图片时会**自动清空**之前的点标注、笔刷涂抹、并重置 undo/redo 栈 |
 | `openFileDialog()` | 弹出浏览器本地文件选择框，选图后内部自动调用 `loadImage(dataURL)`（父组件无需自行处理 FileReader） |
 

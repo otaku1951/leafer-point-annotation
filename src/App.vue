@@ -190,6 +190,24 @@
         <div v-if="uploadLog" class="upload-log">{{ uploadLog }}</div>
       </div>
 
+      <!-- 本地图片 File 上传 demo（演示 loadSuccess 事件推送原始 File 对象） -->
+      <div class="control-group">
+        <h3>本地图片 File 上传到后端（loadSuccess 事件推送原始 File）</h3>
+        <p class="subtle">本地选图后，父组件通过 @load-success 事件拿到原始 File 对象，直接用于 multipart/form-data 上传，无需自己做 dataURL 转换</p>
+        <div v-if="localImageInfo" class="multi-layer-row">
+          <span>isLocal: <b>{{ localImageInfo.isLocal }}</b></span>
+          <span v-if="localImageInfo.file">fileName: <b>{{ localImageInfo.file.name }}</b></span>
+          <span>size: <b>{{ localImageInfo.file ? (localImageInfo.file.size / 1024).toFixed(1) + ' KB' : 'N/A' }}</b></span>
+          <span>dim: <b>{{ localImageInfo.width }} × {{ localImageInfo.height }}</b></span>
+        </div>
+        <div v-else class="subtle">请先在画布上点击"选择图片"或拖拽本地图片</div>
+        <div class="multi-layer-row">
+          <button @click="uploadLocalImageFile">📤 上传本地原始 File 到后端</button>
+          <button @click="localImageUploadLog = ''">清除日志</button>
+        </div>
+        <div v-if="localImageUploadLog" class="upload-log">{{ localImageUploadLog }}</div>
+      </div>
+
       <div class="control-group">
         <h3>Point Label Editor (via ref API)</h3>
         <p class="subtle">点标注后，父组件通过 updatePointAnnotationLabel(id, label) 修改标注点名称</p>
@@ -270,6 +288,7 @@
     <div class="status">
       <h2>Status</h2>
       <p>Image Load Status: {{ loadStatus }}</p>
+      <p v-if="localImageInfo">isLocal: <b>{{ localImageInfo.isLocal }}</b> — {{ localImageInfo.file ? '原始 File 可用，可直接用于 multipart/form-data 上传' : '来自外部 URL，无本地 File' }}</p>
       <p>Multi-Layer Mode: {{ useMultiLayer ? 'ON' : 'OFF' }}</p>
       <p v-if="useMultiLayer">Active Layer (v-model:currentLayer): <b>{{ activeLayer }}</b></p>
     </div>
@@ -469,6 +488,9 @@ const uploadLog = ref<string>('')
 const currentTool = ref<'select' | 'point' | 'brush' | 'eraser'>('select')
 const currentToolDisplay = ref('select')
 const lastAddedPointId = ref<string | null>(null)
+// 本地选图相关：loadSuccess 事件推送的图片信息
+const localImageInfo = ref<any>(null)  // { url, width, height, isLocal, file? }
+const localImageUploadLog = ref<string>('')
 
 // 用于 UI 轮询显示当前笔刷样式（每 500ms 触发一次刷新）
 const brushStyleTick = ref(0)
@@ -584,14 +606,42 @@ const uploadAllMaskFiles = async () => {
   }
 }
 
+// 上传本地图片原始 File 对象到后端（demo）
+// 本地选图后，loadSuccess 事件会推送原始 File 对象，父组件可直接用于 multipart/form-data 上传
+const uploadLocalImageFile = async () => {
+  const file = localImageInfo.value?.file as File | undefined
+  if (!file) {
+    localImageUploadLog.value = '❌ 当前不是本地选图，没有原始 File 对象。请先在画布上点击或拖拽选择本地图片'
+    return
+  }
+  if (!uploadApiUrl.value) {
+    localImageUploadLog.value = '❌ 请先填写上传接口 URL'
+    return
+  }
+  try {
+    const formData = new FormData()
+    formData.append(uploadFieldName.value || 'file', file)
+    localImageUploadLog.value = `⏳ 正在上传 ${file.name} (${(file.size / 1024).toFixed(1)} KB) 到 ${uploadApiUrl.value}...`
+    const res = await fetch(uploadApiUrl.value, { method: 'POST', body: formData })
+    const text = await res.text()
+    localImageUploadLog.value = `✅ 上传完成，状态 ${res.status}，响应: ${text.substring(0, 300)}`
+  } catch (e) {
+    localImageUploadLog.value = `❌ 上传失败: ${e}`
+  }
+}
+
 // 处理图片加载开始
 const handleLoadStart = () => {
   loadStatus.value = 'loading'
 }
 
 // 处理图片加载成功
-const handleLoadSuccess = () => {
+// info: { url, width, height, isLocal, file? } — 本地选图时 file 为原始 File 对象
+const handleLoadSuccess = (info?: any) => {
   loadStatus.value = 'success'
+  localImageInfo.value = info || null
+  localImageUploadLog.value = ''
+  console.log('[App.vue] loadSuccess payload:', info)
 }
 
 // 处理图片加载失败

@@ -22,6 +22,8 @@ export interface OptionsSource {
   enableBrush?: boolean;
   enableHotkeys?: boolean;  // 是否启用键盘快捷键（默认 false）
   brushCursorEnabled?: boolean;  // 是否显示笔刷/橡皮擦的自定义鼠标光标（默认 true）
+  loadingGradientColors?: [string, string];  // 加载中渐变动画的两个颜色（默认：淡紫 -> 淡蓝）
+  loadingTextColor?: string;  // 加载中文字颜色（默认：#4a5568）
 }
 
 // 点标注数据结构

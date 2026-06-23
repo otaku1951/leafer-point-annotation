@@ -114,7 +114,8 @@
 }
 
 // Events（defineEmits）
-pointChange | loadStart | loadSuccess | loadError
+pointChange | loadStart | loadSuccess({ url, width, height, isLocal, file? }) | loadError
+//                                              ↑ 本地选图时有 isLocal=true 和原始 File 对象
 undoStateChange | redoStateChange
 update:currentLayer | layerChange
 ```
@@ -180,6 +181,9 @@ interface OptionsSource {
                                 //   - 删除确认文案不包含"笔刷"
   enableHotkeys?: boolean       // 默认 false；设为 true 时才绑定 tinykeys 快捷键
                                 //   (v/p/b/e/Ctrl+Z/Ctrl+Y/Delete/Ctrl+±/Ctrl+0/Alt)
+  brushCursorEnabled?: boolean // 默认 true；设为 false 时禁用笔刷/橡皮擦的自定义跟随光标
+  loadingGradientColors?: [string, string]  // 加载中渐变动画两个颜色（默认：淡紫 -> 淡蓝）
+  loadingTextColor?: string    // 加载中文字颜色（默认：#4a5568）
 }
 ```
 
@@ -229,7 +233,7 @@ App (leafer-ui)
 | `removePointAnnotation(id)` | 程序化删除一个点 |
 | `updatePointAnnotationLabel(id, label)` | 修改某个点的 label 文案 |
 | **图片 & 画布** | |
-| `getImageInfo()` | 返回 `{ url, width, height }` |
+| `getImageInfo()` | 返回 `{ url, width, height, isLocal, file? }`（本地选图时有 `file` 原始 `File` 对象） |
 | `loadImage(url?)` | 动态加载图片（不传参数时从 imageSource 读取）。切换图片会**自动清空**之前的点标注、笔刷、并重置 undo/redo 栈 |
 | `openFileDialog()` | 弹出浏览器本地文件选择框，内部自动调用 loadImage(dataURL)（父组件无需自行处理 FileReader） |
 | **工具切换** | |

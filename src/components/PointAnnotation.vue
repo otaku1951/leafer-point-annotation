@@ -15,6 +15,7 @@
       @dragover="handleDragOver"
       @dragleave="handleDragLeave"
       @drop="handleDrop"
+      :style="loadingStyleVars"
     >
       <!-- 加载占位 -->
       <div
@@ -346,6 +347,7 @@ const imageWidth = ref<number | null>(null);
 const imageHeight = ref<number | null>(null);
 const hasLocalImage = ref(false);
 const localImageUrl = ref<string>('');
+const localImageFile = ref<File | null>(null);
 const isDragOver = ref(false);
 let app: App | null = null;
 let imageBox: Image | null = null;
@@ -374,6 +376,19 @@ const showToolbar = computed(() => hasImage.value && (props.options?.showToolbar
 const showZoomController = computed(() => hasImage.value && (props.options?.showZoomController !== false));
 const effectiveEnableBrush = computed(() => props.options?.enableBrush !== false);
 const brushCursorEnabled = computed(() => props.options?.brushCursorEnabled !== false);
+
+// 加载中样式变量（通过 CSS 变量注入）
+const loadingStyleVars = computed(() => {
+  const defaultColors: [string, string] = ['#f0edff', '#e6f0ff'];  // 淡紫 -> 淡蓝
+  const colors = props.options?.loadingGradientColors || defaultColors;
+  const textColor = props.options?.loadingTextColor || '#4a5568';
+  
+  return {
+    '--loading-gradient-start': colors[0],
+    '--loading-gradient-end': colors[1],
+    '--loading-text-color': textColor,
+  };
+});
 
 // 点标注样式配置
 const pointStyle = computed<PointStyle>(() => ({
@@ -445,13 +460,16 @@ watch(
   () => props.imageSource?.url,
   (newUrl, oldUrl) => {
     if (newUrl) {
+      // 切换到外部图片：清理本地图片缓存
       hasLocalImage.value = false;
       localImageUrl.value = '';
+      localImageFile.value = null;
       loadImage(newUrl);
     } else if (oldUrl && !newUrl) {
       // 如果原来有图片，现在没有了，清空画布
       hasLocalImage.value = false;
       localImageUrl.value = '';
+      localImageFile.value = null;
       clearAllAnnotationsAndBrush();
       // 移除图片
       if (imageBox) {
@@ -692,7 +710,13 @@ const loadImage = async (imageSrc?: string | undefined) => {
 
     imageBox.on(ImageEvent.LOADED, function () {
       loadStatus.value = "success";
-      emit("loadSuccess");
+      emit("loadSuccess", {
+        url: hasLocalImage.value ? localImageUrl.value : (props.imageSource?.url || ''),
+        width: imageWidth.value,
+        height: imageHeight.value,
+        isLocal: hasLocalImage.value,
+        file: localImageFile.value || undefined,
+      });
       fitImageToCanvas();
       initBrushLayer();
     });
@@ -720,6 +744,8 @@ const getImageInfo = () => {
     url: hasLocalImage.value ? localImageUrl.value : (props.imageSource?.url || ''),
     width: imageWidth.value,
     height: imageHeight.value,
+    isLocal: hasLocalImage.value,
+    file: localImageFile.value || undefined,
   };
 };
 
@@ -731,6 +757,7 @@ const handleFileUpload = (event: Event) => {
     reader.onload = (e) => {
       const result = e.target?.result as string;
       localImageUrl.value = result;
+      localImageFile.value = file;
       hasLocalImage.value = true;
       loadImage(result);
     };
@@ -768,6 +795,7 @@ const handleDrop = (event: DragEvent) => {
       reader.onload = (e) => {
         const result = e.target?.result as string;
         localImageUrl.value = result;
+        localImageFile.value = file;
         hasLocalImage.value = true;
         loadImage(result);
       };
@@ -2285,11 +2313,11 @@ declare global {
   left: 0;
   right: 0;
   bottom: 0;
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  background: linear-gradient(135deg, var(--loading-gradient-start, #f0edff) 0%, var(--loading-gradient-end, #e6f0ff) 100%);
   background-size: 200% 200%;
   animation: gradientShift var(--leafer-point-animation-gradient) ease-in-out
     infinite;
-  opacity: 0.7;
+  opacity: 0.6;
 }
 
 @keyframes gradientShift {
@@ -2307,10 +2335,10 @@ declare global {
 .loading-text {
   position: relative;
   z-index: 1;
-  color: white;
+  color: var(--loading-text-color, #4a5568);
   font-size: 18px;
   font-weight: 500;
-  text-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+  text-shadow: none;
 }
 
 .upload-overlay {

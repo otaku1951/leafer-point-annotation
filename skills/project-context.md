@@ -75,6 +75,14 @@
 - 无图片时不渲染画布/工具栏/缩放控制器
 - ✨ **`openFileDialog()`**：父组件可调用此方法弹出本地文件选择框，无需父组件自行处理 `<input type="file">` / FileReader
 - ✨ **切换图片时自动重置**：`loadImage()` 切换到新图片时会自动清空所有点标注、清空所有图层笔刷内容、重置 undo/redo 栈
+- ✨ **`loadSuccess` 事件 payload 扩展**：新增 `isLocal: boolean` 和 `file?: File` 字段；本地选图时有原始 `File` 对象，可直接用于后端 multipart/form-data 上传
+
+### 2.8 笔刷动态光标（v1.1 新增）
+- `options.brushCursorEnabled`（默认 true）控制是否显示笔刷/橡皮擦的自定义跟随光标
+- 切换到 brush/eraser 工具时，光标显示为笔刷形状
+- 光标颜色、大小、透明度与当前笔刷样式实时同步
+- brush 模式下 fill = 笔刷颜色，eraser 模式下 fill = transparent / stroke = #ffffff
+- 切换到 brush/eraser 时自动隐藏默认鼠标指针，退出时恢复
 
 ---
 
@@ -96,6 +104,9 @@ interface OptionsSource {
   // 功能开关
   enableBrush?: boolean                     // ✨ 是否启用笔刷（默认 true），false 时所有笔刷功能失效
   enableHotkeys?: boolean                   // ✨ 是否启用键盘快捷键（默认 false），默认全部禁用
+  brushCursorEnabled?: boolean             // ✨ 是否显示笔刷/橡皮擦的自定义跟随光标（默认 true）
+  loadingGradientColors?: [string, string]  // 加载中渐变动画的两个颜色（默认：淡紫 -> 淡蓝）
+  loadingTextColor?: string                // 加载中文字颜色（默认：'#4a5568'）
 
   // UI 开关
   showToolbar?: boolean                     // 是否显示内置工具栏（默认 true）
@@ -186,7 +197,7 @@ import {
 |--------|------|---------|
 | `point-change` | `(points: PointAnnotation[])` | 点新增/删除/修改/重排 |
 | `load-start` | - | 开始加载图片 |
-| `load-success` | `{ url, width, height }` | 图片加载成功 |
+| `load-success` | `{ url, width, height, isLocal, file? }` | 图片加载成功（本地选图时 `isLocal=true`，`file` 为原始 `File` 对象，可直接用于后端 multipart 上传） |
 | `load-error` | `{ error }` | 图片加载失败 |
 | `undo-state-change` | `{ canUndo }` | 撤销栈状态变化 |
 | `redo-state-change` | `{ canRedo }` | 重做栈状态变化 |
@@ -209,7 +220,7 @@ import {
 - `findPointBySequenceNumber(seq)` - 按圆圈内显示的数字序号查找点，返回 `{ id, data }` 或 null（跨实例联动时，按视觉序号匹配更可靠）
 
 ### 5.2 图片 & 画布
-- `getImageInfo()` - `{ url, width, height }`
+- `getImageInfo()` - ✨ `{ url, width, height, isLocal, file? }`（本地选图时有 `file` 原始 `File` 对象）
 - `loadImage(url?)` - 动态加载新图片（不传参数时从 imageSource 读取）。切换图片会**自动清空**之前的点标注、笔刷、并重置 undo/redo 栈
 - `openFileDialog()` - ✨ 弹出浏览器本地文件选择框，组件内部自动调用 loadImage(dataURL)；父组件无需自行处理 `<input type="file">` 或 FileReader
 
