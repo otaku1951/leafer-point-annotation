@@ -322,7 +322,8 @@ const baseOptions: OptionsSource = {
     color: '#ff4d4f',
     opacity: 0.55,
     size: 100
-  }
+  },
+  brushCursorEnabled: false
 }
 
 const showToolbar = ref(false)

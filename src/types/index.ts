@@ -21,6 +21,7 @@ export interface OptionsSource {
   zoomMax?: number;
   enableBrush?: boolean;
   enableHotkeys?: boolean;  // 是否启用键盘快捷键（默认 false）
+  brushCursorEnabled?: boolean;  // 是否显示笔刷/橡皮擦的自定义鼠标光标（默认 true）
 }
 
 // 点标注数据结构

@@ -279,6 +279,7 @@ import {
   ZoomEvent,
   Image,
   Group,
+  Ellipse,
 } from "leafer-ui";
 import "@leafer-in/editor";
 import "@leafer-in/resize";
@@ -372,6 +373,7 @@ const hasImage = computed(() => loadStatus.value === 'success');
 const showToolbar = computed(() => hasImage.value && (props.options?.showToolbar !== false));
 const showZoomController = computed(() => hasImage.value && (props.options?.showZoomController !== false));
 const effectiveEnableBrush = computed(() => props.options?.enableBrush !== false);
+const brushCursorEnabled = computed(() => props.options?.brushCursorEnabled !== false);
 
 // 点标注样式配置
 const pointStyle = computed<PointStyle>(() => ({
@@ -403,6 +405,38 @@ watch(
     Object.values(canvasBrushesByLayer.value).forEach(brush => {
       brush.setOpacity(newOpacity);
     });
+  }
+);
+
+// 监听笔刷属性变化（颜色/大小/透明度），同步更新笔刷光标样式
+watch(
+  () => ({
+    color: localBrushStyle.value.color,
+    size: localBrushStyle.value.size,
+    opacity: localBrushStyle.value.opacity,
+  }),
+  () => {
+    updateBrushCursorStyle();
+  },
+  { deep: true }
+);
+
+// 监听当前工具变化，同步显示/隐藏笔刷光标
+watch(
+  currentTool,
+  () => {
+    syncBrushCursorVisibility();
+  }
+);
+
+// 监听笔刷光标开关配置变化，运行时切换也能生效
+watch(
+  brushCursorEnabled,
+  () => {
+    if (brushCursorEnabled.value && !brushCursorLayer) {
+      createBrushCursor();
+    }
+    syncBrushCursorVisibility();
   }
 );
 
@@ -510,6 +544,11 @@ watch(
 // 笔刷相关状态
 const isDrawing = ref(false);
 
+// 笔刷光标（跟随鼠标的预览圆圈）
+let brushCursorCircle: Ellipse | null = null;
+let brushCursorGroup: Group | null = null;
+let brushCursorLayer: Group | null = null;  // 独立图层，zIndex 高于 pointLayer
+
 // 撤销/重做管理器
 let commandManager: CommandManager | null = null;
 
@@ -555,6 +594,9 @@ const initCanvas = () => {
   // 设置图层的 zIndex
   pointLayer.zIndex = 10000;
 
+  // 创建笔刷光标（跟随鼠标的预览圆圈）
+  createBrushCursor();
+
   if (app) {
     app.on(ZoomEvent.ZOOM, () => {
       updateZoomLevel();
@@ -568,6 +610,19 @@ const initCanvas = () => {
     app.on(PointerEvent.DOWN, handleBrushDown);
     app.on(PointerEvent.MOVE, handleBrushMove);
     app.on(PointerEvent.UP, handleBrushUp);
+
+    // 笔刷光标跟随鼠标
+    app.on(PointerEvent.MOVE, (e: any) => {
+      if (!brushCursorCircle || !brushCursorGroup || !brushCursorGroup.visible || !app) return;
+      // 关键修复：e.x/e.y 是 app 根级坐标（屏幕坐标）
+      // brushCursorCircle 在 app.tree 子层内部，需要转换到 app.tree 本地坐标
+      const treeScale = (app.tree as any).scale ?? 1;
+      const treeX = (app.tree as any).x ?? 0;
+      const treeY = (app.tree as any).y ?? 0;
+      const localX = (e.x - treeX) / treeScale;
+      const localY = (e.y - treeY) / treeScale;
+      updateBrushCursorPos(localX, localY);
+    });
   }
 };
 
@@ -1182,6 +1237,10 @@ onUnmounted(() => {
     app?.tree.remove(imageBox);
     imageBox = null;
   }
+
+  // 销毁笔刷光标
+  destroyBrushCursor();
+
   app?.destroy();
   app = null;
 
@@ -1262,6 +1321,146 @@ const eraserTool = () => {
   });
   updateLabelEditable(false);
 };
+
+// ====== 笔刷光标（跟随鼠标的预览圆圈） ======
+
+const createBrushCursor = () => {
+  if (!app) return;
+  if (brushCursorLayer) return;  // 已创建，避免重复
+  if (!brushCursorEnabled.value) return;  // 用户配置关闭了笔刷光标，不创建
+
+  // 独立图层，zIndex 高于 pointLayer，放在最上层
+  brushCursorLayer = new Group({
+    name: 'brushCursorLayer',
+    pointerEvents: 'none',
+  });
+  app.tree.add(brushCursorLayer);
+  brushCursorLayer.zIndex = 20000;
+
+  // 外层 Group 用于控制透明度
+  brushCursorGroup = new Group({
+    pointerEvents: 'none',
+    visible: false,
+  });
+  brushCursorLayer.add(brushCursorGroup);
+
+  // 核心圆圈
+  const style = localBrushStyle.value;
+  brushCursorCircle = new Ellipse({
+    around: 'center',
+    width: style.size,
+    height: style.size,
+    fill: style.color,
+    stroke: style.color,
+    strokeWidth: 1,
+    pointerEvents: 'none',
+  });
+  brushCursorGroup.add(brushCursorCircle);
+
+  updateBrushCursorStyle();
+};
+
+const showBrushCursor = () => {
+  if (!brushCursorGroup) return;
+  brushCursorGroup.visible = true;
+  updateBrushCursorStyle();
+};
+
+const hideBrushCursor = () => {
+  if (!brushCursorGroup) return;
+  brushCursorGroup.visible = false;
+};
+
+const updateBrushCursorStyle = () => {
+  if (!brushCursorCircle || !brushCursorGroup) return;
+  const style = localBrushStyle.value;
+  const tool = currentTool.value;
+
+  if (tool === 'brush') {
+    // 笔刷模式：实心填充圆 + 颜色控制透明度
+    brushCursorCircle.set({
+      width: style.size,
+      height: style.size,
+      fill: style.color,
+      stroke: style.color,
+      strokeWidth: 1,
+      dashPattern: null as any,
+    });
+    brushCursorGroup.opacity = style.opacity;
+  } else if (tool === 'eraser') {
+    // 橡皮擦模式：空心黑白双环，保证在任何背景下可见
+    brushCursorCircle.set({
+      width: style.size,
+      height: style.size,
+      fill: 'transparent',
+      stroke: '#ffffff',
+      strokeWidth: 2,
+      dashPattern: null as any,
+    });
+    brushCursorGroup.opacity = 1;
+  }
+  // 确保 around = center 使得圆心对齐鼠标
+  brushCursorCircle.around = 'center';
+};
+
+const updateBrushCursorPos = (x: number, y: number) => {
+  if (!brushCursorCircle) return;
+  brushCursorCircle.set({ x, y });
+};
+
+// 切换工具时统一更新光标显示状态
+const syncBrushCursorVisibility = () => {
+  // 配置关闭：不显示自定义光标，也不隐藏浏览器默认指针
+  if (!brushCursorEnabled.value) {
+    hideBrushCursor();
+    if (canvasContainer.value) {
+      canvasContainer.value.style.cursor = '';
+      canvasContainer.value.querySelectorAll('canvas').forEach((el) => {
+        (el as HTMLCanvasElement).style.cursor = '';
+      });
+    }
+    return;
+  }
+  const isBrushMode = currentTool.value === 'brush' || currentTool.value === 'eraser';
+  if (isBrushMode) {
+    showBrushCursor();
+  } else {
+    hideBrushCursor();
+  }
+  // 隐藏浏览器默认鼠标指针（笔刷/橡皮擦模式用自定义圆圈光标替代）
+  // 作用于 canvas 容器与内部所有 canvas 元素（防止 Leafer 内部元素可能自带 cursor）
+  if (canvasContainer.value) {
+    canvasContainer.value.style.cursor = isBrushMode ? 'none' : '';
+    canvasContainer.value.querySelectorAll('canvas').forEach((el) => {
+      (el as HTMLCanvasElement).style.cursor = isBrushMode ? 'none' : '';
+    });
+  }
+};
+
+// 销毁笔刷光标
+const destroyBrushCursor = () => {
+  // 恢复浏览器默认指针，防止卸载后残留 cursor: none
+  if (canvasContainer.value) {
+    canvasContainer.value.style.cursor = '';
+    canvasContainer.value.querySelectorAll('canvas').forEach((el) => {
+      (el as HTMLCanvasElement).style.cursor = '';
+    });
+  }
+  if (brushCursorCircle) {
+    brushCursorCircle.destroy();
+    brushCursorCircle = null;
+  }
+  if (brushCursorGroup) {
+    brushCursorGroup.destroy();
+    brushCursorGroup = null;
+  }
+  if (brushCursorLayer) {
+    brushCursorLayer.destroy();
+    brushCursorLayer = null;
+  }
+};
+
+// ====== /笔刷光标 ======
 
 // 初始化所有笔刷图层（在图片加载后调用）
 // 当 enableBrush=false 时，仅做清理工作，不创建任何笔刷 canvas
