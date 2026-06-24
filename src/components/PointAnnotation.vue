@@ -849,7 +849,7 @@ const buildMaskCanvas = (
       const canvas = document.createElement('canvas');
       canvas.width = imageWidth.value || 0;
       canvas.height = imageHeight.value || 0;
-      const ctx = canvas.getContext('2d');
+      const ctx = canvas.getContext('2d', { willReadFrequently: true });
       if (!ctx) {
         resolve(null);
         return;
@@ -905,6 +905,13 @@ const exportSingleLayerMask = async (
 const exportMaskImage = (format?: 'png' | 'jpeg' | 'jpg', foregroundColor?: 'black' | 'white'): Promise<string | null> => {
   if (!effectiveEnableBrush.value) return Promise.resolve(null);
   if (!activeCanvasBrush.value) return Promise.resolve(null);
+  
+  // ✅ 真实判断：检查 brush 是否有实际内容
+  if (!activeCanvasBrush.value.hasContent?.()) {
+    console.log('[exportMaskImage] 当前图层没有笔刷内容');
+    return Promise.resolve(null);
+  }
+  
   return exportSingleLayerMask(activeCanvasBrush.value, format, foregroundColor);
 };
 
@@ -917,6 +924,12 @@ const exportMaskImageByLayer = (
   if (!effectiveEnableBrush.value) return Promise.resolve(null);
   const brush = canvasBrushesByLayer.value[layerValue];
   if (!brush) return Promise.resolve(null);
+  
+  // ✅ 真实判断：检查 brush 是否有实际内容
+  if (!brush.hasContent?.()) {
+    console.log(`[exportMaskImageByLayer] 图层 ${layerValue} 没有笔刷内容`);
+    return Promise.resolve(null);
+  }
   return exportSingleLayerMask(brush, format, foregroundColor);
 };
 
@@ -964,6 +977,13 @@ const getMaskBlob = (
     ? canvasBrushesByLayer.value[layerValue]
     : activeCanvasBrush.value;
   if (!brush) return Promise.resolve(null);
+  
+  // ✅ 真实判断：检查 brush 是否有实际内容
+  if (!brush.hasContent?.()) {
+    console.log(`[getMaskBlob] 图层 ${layerValue || '当前'} 没有笔刷内容`);
+    return Promise.resolve(null);
+  }
+  
   return new Promise(async (resolve) => {
     const result = await buildMaskCanvas(brush, format, foregroundColor);
     if (!result) return resolve(null);
@@ -1007,6 +1027,11 @@ const getAllMaskBlobs = (
   return new Promise(async (resolve) => {
     const result: Record<string, Blob> = {};
     for (const [layerValue, brush] of Object.entries(canvasBrushesByLayer.value)) {
+      // ✅ 真实判断：检查 brush 是否有实际内容
+      if (!brush.hasContent?.()) {
+        console.log(`[getAllMaskBlobs] 图层 ${layerValue} 没有笔刷内容，跳过`);
+        continue;
+      }
       const canvasResult = await buildMaskCanvas(brush, format, foregroundColor);
       if (!canvasResult) continue;
       const blob = await canvasToBlob(canvasResult.canvas, canvasResult.mime);
