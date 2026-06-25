@@ -16,6 +16,7 @@
         @loadSuccess="handleLoadSuccess"
         @loadError="handleLoadError"
         @update:currentLayer="handleLayerChange"
+        @init="handleAnnotationInit"
       />
       <PointAnnotation 
         v-if="enableMultiInstance"
@@ -720,6 +721,12 @@ const fetchPointData = () => {
     const annotations = pointAnnotation.value.getPointAnnotations()
     pointData.value = JSON.stringify(annotations, null, 2)
   }
+}
+
+// 监听组件初始化完成事件（更可靠的方式）
+const handleAnnotationInit = () => {
+  console.log('PointAnnotation initialized, now calling pointTool()');
+  pointAnnotation.value?.pointTool();
 }
 
 // 导出画布JSON

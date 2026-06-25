@@ -338,6 +338,7 @@ const emit = defineEmits([
   "layerChange",
   "point-hover",
   "point-select",
+  "init",
 ]);
 
 const canvasContainer = ref<HTMLElement | undefined>(undefined);
@@ -642,6 +643,8 @@ const initCanvas = () => {
       updateBrushCursorPos(localX, localY);
     });
   }
+
+  emit("init");
 };
 
 const preloadImageSize = (
@@ -1162,7 +1165,6 @@ const importCanvasJSON = async (
 };
 
 onMounted(() => {
-  nextTick(() => {
     initCanvas();
     loadImage();
 
@@ -1244,7 +1246,6 @@ onMounted(() => {
       // 🔧 多实例支持：unsubscribe 保存在当前组件作用域，不再使用全局 window 存储
       hotkeysUnsubscribe = unsubscribe;
     }
-  });
 });
 
 const handleMouseMove = (e: MouseEvent) => {
