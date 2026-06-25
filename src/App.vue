@@ -140,6 +140,7 @@
           </label>
         </div>
         <button @click="exportMaskImage">Export Current Layer Mask</button>
+        <button @click="exportMaskUIBlob">Export UI Layer (Visual)</button>
         <button @click="clearBrush">Clear Current Layer Brush</button>
         <button @click="clearAllBrushLayers" v-if="useMultiLayer">Clear ALL Layers</button>
       </div>
@@ -778,6 +779,22 @@ const exportMaskImage = async () => {
     } else {
       alert('No brush data to export.')
     }
+  }
+}
+
+// 导出UI层（预览层）- 带颜色的视觉效果
+const exportMaskUIBlob = async () => {
+  if (!pointAnnotation.value) return
+  const blob = await pointAnnotation.value.getMaskUIBlob?.()
+  if (blob) {
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = 'brush-ui-mask.png'
+    a.click()
+    URL.revokeObjectURL(url)
+  } else {
+    alert('No brush data to export (UI layer).')
   }
 }
 

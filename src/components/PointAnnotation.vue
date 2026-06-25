@@ -827,7 +827,6 @@ const exportCanvasJSON = (): string => {
 };
 
 // 内部辅助：把笔刷图层渲染为 HTMLCanvas + mime（二值图）
-// 所有导出方法（dataURL / Blob / File）统一复用这个逻辑，避免重复代码
 const buildMaskCanvas = (
   brush: any,
   format?: 'png' | 'jpeg' | 'jpg',
@@ -838,52 +837,38 @@ const buildMaskCanvas = (
     const fgColor = foregroundColor || props.options?.maskExportForeground || 'black';
     const mime = exportFormat === 'png' ? 'image/png' : 'image/jpeg';
 
-    const maskData = brush.getImageData();
-    if (!maskData) {
+    const dataCanvas = brush.getDataCanvas?.();
+    if (!dataCanvas) {
       resolve(null);
       return;
     }
 
-    const htmlImg = document.createElement('img');
-    htmlImg.onload = () => {
-      const canvas = document.createElement('canvas');
-      canvas.width = imageWidth.value || 0;
-      canvas.height = imageHeight.value || 0;
-      const ctx = canvas.getContext('2d', { willReadFrequently: true });
-      if (!ctx) {
-        resolve(null);
-        return;
-      }
-
-      ctx.drawImage(htmlImg, 0, 0);
-
-      const isWhite = fgColor === 'white';
-      const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
-      const data = imageData.data;
-
-      for (let i = 0; i < data.length; i += 4) {
-        if (data[i + 3] > 0) {
-          data[i] = isWhite ? 255 : 0;
-          data[i + 1] = isWhite ? 255 : 0;
-          data[i + 2] = isWhite ? 255 : 0;
-          data[i + 3] = 255;
-        } else if (exportFormat !== 'png') {
-          data[i] = isWhite ? 0 : 255;
-          data[i + 1] = isWhite ? 0 : 255;
-          data[i + 2] = isWhite ? 0 : 255;
-          data[i + 3] = 255;
-        }
-      }
-      ctx.putImageData(imageData, 0, 0);
-
-      resolve({ canvas, mime });
-    };
-
-    htmlImg.onerror = () => {
+    const canvas = document.createElement('canvas');
+    canvas.width = imageWidth.value || 0;
+    canvas.height = imageHeight.value || 0;
+    const ctx = canvas.getContext('2d', { willReadFrequently: true });
+    if (!ctx) {
       resolve(null);
-    };
+      return;
+    }
 
-    htmlImg.src = maskData;
+    const isWhite = fgColor === 'white';
+    const backgroundColor = isWhite ? 'black' : 'white';
+    const contentColor = isWhite ? 'white' : 'black';
+
+    ctx.drawImage(dataCanvas.context.canvas, 0, 0);
+
+    ctx.globalCompositeOperation = 'source-in';
+    ctx.fillStyle = contentColor;
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+    ctx.globalCompositeOperation = 'source-over';
+
+    ctx.globalCompositeOperation = 'destination-over';
+    ctx.fillStyle = backgroundColor;
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+    ctx.globalCompositeOperation = 'source-over';
+
+    resolve({ canvas, mime });
   });
 };
 
@@ -1020,6 +1005,47 @@ const getMaskFile = (
       fallback.type = mime;
       resolve(fallback);
     }
+  });
+};
+
+// 导出 UI 层（预览层）的 blob（带颜色的视觉效果）
+// - layerValue: 图层标识（不传则为当前激活图层）
+// - 笔刷禁用时返回 null
+const getMaskUIBlob = (layerValue?: string): Promise<Blob | null> => {
+  if (!effectiveEnableBrush.value) return Promise.resolve(null);
+  
+  const brush = layerValue 
+    ? canvasBrushesByLayer.value[layerValue] 
+    : activeCanvasBrush.value;
+  
+  if (!brush) return Promise.resolve(null);
+  
+  return new Promise((resolve) => {
+    const previewData = brush.getPreviewImageData?.();
+    if (!previewData) {
+      resolve(null);
+      return;
+    }
+    
+    const htmlImg = document.createElement('img');
+    htmlImg.onload = () => {
+      const canvas = document.createElement('canvas');
+      canvas.width = imageWidth.value || 0;
+      canvas.height = imageHeight.value || 0;
+      const ctx = canvas.getContext('2d');
+      if (!ctx) {
+        resolve(null);
+        return;
+      }
+      ctx.drawImage(htmlImg, 0, 0);
+      canvas.toBlob((blob) => {
+        resolve(blob || null);
+      }, 'image/png');
+    };
+    htmlImg.onerror = () => {
+      resolve(null);
+    };
+    htmlImg.src = previewData;
   });
 };
 
@@ -2074,7 +2100,20 @@ const setTool = (tool: "select" | "point" | "brush" | "eraser") => {
   if (!effectiveEnableBrush.value && (tool === 'brush' || tool === 'eraser')) {
     return;
   }
-  currentTool.value = tool;
+  switch (tool) {
+    case 'point':
+      pointTool();
+      break;
+    case 'brush':
+      brushTool();
+      break;
+    case 'eraser':
+      eraserTool();
+      break;
+    case 'select':
+      selectTool();
+      break;
+  }
 };
 
 // 根据当前数组顺序重排所有点的显示序号（sequenceNumber）
@@ -2218,6 +2257,7 @@ defineExpose({
   getMaskBlob,
   getMaskFile,
   getAllMaskBlobs,
+  getMaskUIBlob,
   exportCOCO,
   exportYOLO,
   importCanvasJSON,
