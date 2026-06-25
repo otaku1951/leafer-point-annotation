@@ -942,6 +942,11 @@ const exportAllMaskImages = (
   return new Promise(async (resolve) => {
     const result: Record<string, string> = {};
     for (const [layerValue, brush] of Object.entries(canvasBrushesByLayer.value)) {
+      // ✅ 真实判断：检查 brush 是否有实际内容
+      if (!brush.hasContent?.()) {
+        console.log(`[exportAllMaskImages] 图层 ${layerValue} 没有笔刷内容，跳过`);
+        continue;
+      }
       const mask = await exportSingleLayerMask(brush, format, foregroundColor);
       if (mask) {
         result[layerValue] = mask;
@@ -1329,6 +1334,7 @@ const pointTool = () => {
   if (!app) return 
   app.editor.config.moveable = true
   app.editor.config.multipleSelect = false
+  app.editor.config.boxSelect = false
   Object.values(canvasBrushesByLayer.value).forEach(brush => brush.setPointerEvents(false));
   updateLabelEditable(false);
 };
