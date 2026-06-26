@@ -2,6 +2,10 @@
 export interface ImageSource {
   id?: string;
   url: string;
+  width?: number;
+  height?: number;
+  isLocal?: boolean;
+  file: File | null;
 }
 
 // 组件配置项（props.options 的类型）

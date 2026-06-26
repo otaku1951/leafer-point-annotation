@@ -69,13 +69,12 @@
 - 快捷键列表：`v` (select)、`p` (point)、`b` (brush, 需 enableBrush)、`e` (eraser, 需 enableBrush)、`Ctrl+Z` (undo)、`Ctrl+Y` (redo)、`Delete` (删除选中)、`Ctrl++/-` (缩放)、`Ctrl+0` (重置)、`Alt` (快捷键提示)
 
 ### 2.7 图片加载
-- `props.imageSource.url` 加载远程图片
+- **单一数据源**：图片加载完全依赖 `props.imageSource`
 - 不传 imageSource 时显示大面积上传区域（点击选择 + 拖拽文件）
-- 本地图片上传后若 props.url 变化，会重新加载远程
-- 无图片时不渲染画布/工具栏/缩放控制器
-- ✨ **`openFileDialog()`**：父组件可调用此方法弹出本地文件选择框，无需父组件自行处理 `<input type="file">` / FileReader
-- ✨ **切换图片时自动重置**：`loadImage()` 切换到新图片时会自动清空所有点标注、清空所有图层笔刷内容、重置 undo/redo 栈
-- ✨ **`loadSuccess` 事件 payload 扩展**：新增 `isLocal: boolean` 和 `file?: File` 字段；本地选图时有原始 `File` 对象，可直接用于后端 multipart/form-data 上传
+- ✨ **`v-model:imageSource` 双向绑定**：组件内部选择图片后通过 `emit('update:imageSource', ...)` 自动同步到父组件，无需手动监听事件
+- ✨ **Blob URL 优化**：本地图片上传使用 `URL.createObjectURL(file)` 替代 `readAsDataURL`，加载成功后自动 `revokeObjectURL`，避免大图片内存膨胀
+- ✨ **`resetCanvas()`**：重置画布到无图片初始化状态（清除所有标注、笔刷、撤销栈）
+- ✨ **`loadSuccess` 事件 payload**：`{ url, width, height, isLocal, file? }`；本地选图时有原始 `File` 对象，可直接用于后端 multipart/form-data 上传
 
 ### 2.8 笔刷动态光标（v1.1 新增）
 - `options.brushCursorEnabled`（默认 true）控制是否显示笔刷/橡皮擦的自定义跟随光标
@@ -92,10 +91,20 @@
 
 | Prop | 类型 | 说明 |
 |------|------|------|
-| `imageSource` | `{ url: string, id?: string }` | 图片来源；不传则显示本地上传区域 |
+| `imageSource` | `ImageSource` | 图片来源；支持 `v-model:imageSource` 双向绑定；不传则显示本地上传区域 |
 | `options` | `OptionsSource` | 所有可配置项（详见下方） |
 | `currentLayer` | `string` | v-model 受控图层切换 |
 | `beforeCreatePoint` | `(x, y, nx, ny, count) => boolean \| Promise<boolean>` | ✨ 点创建前回调，父组件可控制是否允许创建；返回 false 时提前终止创建流程 |
+
+**ImageSource 完整字段**：
+| 字段 | 类型 | 说明 |
+|------|------|------|
+| `url` | `string` | 图片地址（远程 URL、dataURL 或 blob URL） |
+| `id` | `string` | 可选，业务标识 |
+| `width` | `number` | 图片宽度（加载成功后填充） |
+| `height` | `number` | 图片高度（加载成功后填充） |
+| `isLocal` | `boolean` | 是否为本地图片 |
+| `file` | `File` | 原始文件对象（本地选择时有值） |
 
 ### 3.2 OptionsSource 关键字段
 
@@ -203,6 +212,7 @@ import {
 | `redo-state-change` | `{ canRedo }` | 重做栈状态变化 |
 | `update:currentLayer` | `layerValue` | 当前笔刷图层变化（配合 v-model） |
 | `layer-change` | `layerValue` | 同 update:currentLayer |
+| `update:imageSource` | `ImageSource` | 组件内部选择图片后触发（配合 v-model:imageSource） |
 | `point-hover` | `(pointData, isHovering: boolean)` | 点 hover 状态变化（鼠标移入/移出） |
 | `point-select` | `(pointData, isSelected: boolean)` | 点选中状态变化（点击选中/取消选中） |
 
@@ -221,8 +231,9 @@ import {
 
 ### 5.2 图片 & 画布
 - `getImageInfo()` - ✨ `{ url, width, height, isLocal, file? }`（本地选图时有 `file` 原始 `File` 对象）
-- `loadImage(url?)` - 动态加载新图片（不传参数时从 imageSource 读取）。切换图片会**自动清空**之前的点标注、笔刷、并重置 undo/redo 栈
-- `openFileDialog()` - ✨ 弹出浏览器本地文件选择框，组件内部自动调用 loadImage(dataURL)；父组件无需自行处理 `<input type="file">` 或 FileReader
+- `resetCanvas()` - ✨ 重置画布到无图片初始化状态（清除所有标注、笔刷、撤销栈）
+
+> **图片加载说明**：图片加载完全通过 `props.imageSource` 控制，不再对外暴露 `loadImage()` 和 `openFileDialog()` 方法。组件内部选择图片后通过 `v-model:imageSource` 自动同步到父组件。
 
 ### 5.3 工具切换
 - `getCurrentTool()` - `'select' | 'point' | 'brush' | 'eraser'`

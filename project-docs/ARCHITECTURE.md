@@ -104,7 +104,7 @@
 ```ts
 // Props（defineProps 写法）
 {
-  imageSource?: { url: string, id?: string }   // 图片来源；不传则显示上传区域（支持点击+拖拽）
+  imageSource?: ImageSource                     // 图片来源；支持 v-model:imageSource 双向绑定；不传则显示上传区域（支持点击+拖拽）
   options?: OptionsSource                       // 所有可配置项（见下方）
   currentLayer?: string                         // 受控模式：父组件驱动当前图层
   beforeCreatePoint?: (x, y, nx, ny, existingPointCount) => boolean | Promise<boolean>
@@ -118,7 +118,18 @@ pointChange | loadStart | loadSuccess({ url, width, height, isLocal, file? }) | 
 //                                              ↑ 本地选图时有 isLocal=true 和原始 File 对象
 undoStateChange | redoStateChange
 update:currentLayer | layerChange
+update:imageSource                              // 组件内部选择图片后触发（配合 v-model:imageSource）
 ```
+
+**ImageSource 完整字段**：
+| 字段 | 类型 | 说明 |
+|------|------|------|
+| `url` | `string` | 图片地址（远程 URL、dataURL 或 blob URL） |
+| `id` | `string` | 可选，业务标识 |
+| `width` | `number` | 图片宽度（加载成功后填充） |
+| `height` | `number` | 图片高度（加载成功后填充） |
+| `isLocal` | `boolean` | 是否为本地图片 |
+| `file` | `File` | 原始文件对象（本地选择时有值） |
 
 **beforeCreatePoint 触发流程（必知）**：
 
@@ -234,8 +245,7 @@ App (leafer-ui)
 | `updatePointAnnotationLabel(id, label)` | 修改某个点的 label 文案 |
 | **图片 & 画布** | |
 | `getImageInfo()` | 返回 `{ url, width, height, isLocal, file? }`（本地选图时有 `file` 原始 `File` 对象） |
-| `loadImage(url?)` | 动态加载图片（不传参数时从 imageSource 读取）。切换图片会**自动清空**之前的点标注、笔刷、并重置 undo/redo 栈 |
-| `openFileDialog()` | 弹出浏览器本地文件选择框，内部自动调用 loadImage(dataURL)（父组件无需自行处理 FileReader） |
+| `resetCanvas()` | 重置画布到无图片初始化状态（清除所有标注、笔刷、撤销栈） |
 | **工具切换** | |
 | `getCurrentTool()` | 返回 `'select'/'point'/'brush'/'eraser'` |
 | `setTool(tool)` | 切到指定工具（受 enableBrush 限制） |

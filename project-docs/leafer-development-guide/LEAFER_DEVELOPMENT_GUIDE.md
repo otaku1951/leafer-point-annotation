@@ -582,7 +582,7 @@ async function exportMaskImage(
       const canvas = document.createElement('canvas')
       canvas.width = imageWidth.value || 0
       canvas.height = imageHeight.value || 0
-      const ctx = canvas.getContext('2d')
+      const ctx = canvas.getContext('2d', { willReadFrequently: true })
       if (!ctx) {
         resolve(null)
         return

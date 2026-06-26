@@ -5,7 +5,7 @@
     <div class="editor-container" :class="{ 'multi-instance': enableMultiInstance }">
       <PointAnnotation 
         ref="pointAnnotation"
-        :imageSource="imageSource" 
+        v-model:imageSource="imageSource" 
         :options="editorOptions"
         v-model:currentLayer="activeLayer"
         :before-create-point="useBeforeCreatePoint ? beforeCreatePoint : undefined"
@@ -144,6 +144,7 @@
         <button @click="exportMaskUIBlob">Export UI Layer (Visual)</button>
         <button @click="clearBrush">Clear Current Layer Brush</button>
         <button @click="clearAllBrushLayers" v-if="useMultiLayer">Clear ALL Layers</button>
+        <button @click="resetCanvas" class="danger">Reset Canvas (No Image)</button>
       </div>
 
       <div class="control-group">
@@ -304,11 +305,16 @@ import type { OptionsSource } from './types'
 
 // 图片URL
 const imageUrl = ref('')
-const imageSource = computed(() => {
-  if (!imageUrl.value) return undefined
-  return {
-    id: 'test-image',
-    url: imageUrl.value
+const imageSource = ref<any>(null)
+
+watch(imageUrl, (newUrl) => {
+  if (newUrl) {
+    imageSource.value = {
+      id: 'test-image',
+      url: newUrl
+    }
+  } else {
+    imageSource.value = null
   }
 })
 
@@ -355,9 +361,14 @@ const zoomMax = ref(4)
 const enableBrush = ref(true)
 const enableMultiInstance = ref(false)
 
-const imageSource2 = computed(() => {
-  if (!imageUrl.value) return undefined
-  return { id: 'test-image-2', url: imageUrl.value }
+const imageSource2 = ref<any>(null)
+
+watch(imageUrl, (newUrl) => {
+  if (newUrl) {
+    imageSource2.value = { id: 'test-image-2', url: newUrl }
+  } else {
+    imageSource2.value = null
+  }
 })
 
 const editorOptions2 = computed<OptionsSource>(() => {
@@ -652,21 +663,20 @@ const handleLoadError = (error: any) => {
   console.error('Image load error:', error)
 }
 
-// 重新加载图片
+// 重新加载图片（通过重置 imageSource 触发）
 const refreshImage = () => {
-  if (pointAnnotation.value) {
-    pointAnnotation.value.loadImage()
+  const currentSource = imageSource.value
+  if (currentSource) {
+    imageSource.value = null
+    setTimeout(() => {
+      imageSource.value = currentSource
+    }, 0)
   }
 }
 
-// 重新选择本地图片（父组件触发 PointAnnotation 的文件选择框）
-// PointAnnotation 内部会自动：
-//   1. 弹出文件选择框
-//   2. FileReader 读取为 dataURL
-//   3. loadImage(dataURL)
-//   4. 销毁旧图片 + 清空旧标注 + 重建笔刷 + 重置 undo 栈
+// 重新选择本地图片（使用组件内部的上传按钮）
 const reselectLocalImage = () => {
-  pointAnnotation.value?.openFileDialog()
+  alert('请点击画布上的"选择图片"按钮进行本地图片选择')
 }
 
 // 📍 beforeCreatePoint 示例：创建点标注前的业务判定
@@ -804,6 +814,14 @@ const exportMaskUIBlob = async () => {
     alert('No brush data to export (UI layer).')
   }
 }
+
+// 重置画布到无图片状态
+const resetCanvas = () => {
+  if (confirm('确定要重置画布吗？这将清除所有标注和笔刷数据，并回到无图片状态。')) {
+    imageSource.value = null;
+    pointAnnotation.value?.resetCanvas();
+  }
+};
 
 // 导出COCO格式
 const exportCOCO = () => {

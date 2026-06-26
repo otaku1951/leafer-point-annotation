@@ -339,6 +339,7 @@ const emit = defineEmits([
   "point-hover",
   "point-select",
   "init",
+  "update:imageSource",
 ]);
 
 const canvasContainer = ref<HTMLElement | undefined>(undefined);
@@ -346,10 +347,8 @@ const fileInputRef = ref<HTMLInputElement | null>(null);
 const loadStatus = ref<"idle" | "loading" | "success" | "error">("idle");
 const imageWidth = ref<number | null>(null);
 const imageHeight = ref<number | null>(null);
-const hasLocalImage = ref(false);
-const localImageUrl = ref<string>('');
-const localImageFile = ref<File | null>(null);
 const isDragOver = ref(false);
+const blobUrls = new Set<string>();
 let app: App | null = null;
 let imageBox: Image | null = null;
 const contentLayer = new Group({ name: "contentLayer" });
@@ -380,7 +379,7 @@ const brushCursorEnabled = computed(() => props.options?.brushCursorEnabled !== 
 
 // 加载中样式变量（通过 CSS 变量注入）
 const loadingStyleVars = computed(() => {
-  const defaultColors: [string, string] = ['#f0edff', '#e6f0ff'];  // 淡紫 -> 淡蓝
+  const defaultColors: [string, string] = ['#e8e0ff', '#d8e8ff'];  // 淡紫 -> 淡蓝
   const colors = props.options?.loadingGradientColors || defaultColors;
   const textColor = props.options?.loadingTextColor || '#4a5568';
   
@@ -456,23 +455,14 @@ watch(
   }
 );
 
-// 监听 props.imageSource 变化，重置本地图片状态
+// 监听 props.imageSource 变化
 watch(
   () => props.imageSource?.url,
   (newUrl, oldUrl) => {
     if (newUrl) {
-      // 切换到外部图片：清理本地图片缓存
-      hasLocalImage.value = false;
-      localImageUrl.value = '';
-      localImageFile.value = null;
       loadImage(newUrl);
     } else if (oldUrl && !newUrl) {
-      // 如果原来有图片，现在没有了，清空画布
-      hasLocalImage.value = false;
-      localImageUrl.value = '';
-      localImageFile.value = null;
       clearAllAnnotationsAndBrush();
-      // 移除图片
       if (imageBox) {
         contentLayer.clear();
         imageBox.destroy();
@@ -481,7 +471,7 @@ watch(
       loadStatus.value = 'idle';
     }
   },
-  { immediate: true }
+  //{ immediate: true }
 );
 
 // 多图层相关状态
@@ -664,9 +654,7 @@ const preloadImageSize = (
 };
 
 const loadImage = async (imageSrc?: string | undefined) => {
-  const _imageSrc = imageSrc 
-    ? imageSrc 
-    : (hasLocalImage.value ? localImageUrl.value : (props.imageSource?.url || ''));
+  const _imageSrc = imageSrc || props.imageSource?.url || '';
   
   if (!app || !_imageSrc) {
     loadStatus.value = "idle";
@@ -678,8 +666,6 @@ const loadImage = async (imageSrc?: string | undefined) => {
     imageBox.destroy();
   }
 
-  // 重置点标注相关状态（切换图片时清空之前的标注）
-  // 注意：pointLayer 独立挂在 app.tree 上，不在 contentLayer 内，需单独清理
   if (pointLayer && pointLayer.children) {
     pointLayer.children.forEach((el: any) => el.destroy());
     pointLayer.clear();
@@ -687,7 +673,6 @@ const loadImage = async (imageSrc?: string | undefined) => {
   pointAnnotations.value = [];
   pointCounter.value = 1;
 
-  // 重置撤销/重做栈（避免切换图片后旧操作仍可撤销）
   if (commandManager) {
     commandManager = new CommandManager(100);
   }
@@ -714,12 +699,18 @@ const loadImage = async (imageSrc?: string | undefined) => {
     imageBox.on(ImageEvent.LOADED, function () {
       loadStatus.value = "success";
       emit("loadSuccess", {
-        url: hasLocalImage.value ? localImageUrl.value : (props.imageSource?.url || ''),
+        url: props.imageSource?.url || '',
         width: imageWidth.value,
         height: imageHeight.value,
-        isLocal: hasLocalImage.value,
-        file: localImageFile.value || undefined,
+        id: props.imageSource?.id || '',
+        isLocal: props.imageSource?.isLocal || false,
+        file: props.imageSource?.file || undefined,
       });
+      const currentUrl = props.imageSource?.url || '';
+      if (blobUrls.has(currentUrl)) {
+        URL.revokeObjectURL(currentUrl);
+        blobUrls.delete(currentUrl);
+      }
       fitImageToCanvas();
       initBrushLayer();
     });
@@ -738,17 +729,14 @@ const loadImage = async (imageSrc?: string | undefined) => {
   }
 };
 
-// 点标注数据结构（内部使用）
-
-
 const getImageInfo = () => {
   return {
-    id: hasLocalImage.value ? 'local-image' : (props.imageSource?.id || ''),
-    url: hasLocalImage.value ? localImageUrl.value : (props.imageSource?.url || ''),
+    id: props.imageSource?.id || '',
+    url: props.imageSource?.url || '',
     width: imageWidth.value,
     height: imageHeight.value,
-    isLocal: hasLocalImage.value,
-    file: localImageFile.value || undefined,
+    isLocal: props.imageSource?.isLocal || false,
+    file: props.imageSource?.file || undefined,
   };
 };
 
@@ -756,15 +744,16 @@ const handleFileUpload = (event: Event) => {
   const target = event.target as HTMLInputElement;
   const file = target.files?.[0];
   if (file && file.type.startsWith('image/')) {
-    const reader = new FileReader();
-    reader.onload = (e) => {
-      const result = e.target?.result as string;
-      localImageUrl.value = result;
-      localImageFile.value = file;
-      hasLocalImage.value = true;
-      loadImage(result);
-    };
-    reader.readAsDataURL(file);
+    const url = URL.createObjectURL(file);
+    blobUrls.add(url);
+    emit('update:imageSource', {
+      id: 'local-image-' + Date.now(),
+      url: url,
+      width: 0,
+      height: 0,
+      isLocal: true,
+      file: file,
+    });
   }
   target.value = '';
 };
@@ -794,15 +783,16 @@ const handleDrop = (event: DragEvent) => {
   if (files && files.length > 0) {
     const file = files[0];
     if (file.type.startsWith('image/')) {
-      const reader = new FileReader();
-      reader.onload = (e) => {
-        const result = e.target?.result as string;
-        localImageUrl.value = result;
-        localImageFile.value = file;
-        hasLocalImage.value = true;
-        loadImage(result);
-      };
-      reader.readAsDataURL(file);
+      const url = URL.createObjectURL(file);
+      blobUrls.add(url);
+      emit('update:imageSource', {
+        id: 'local-image-' + Date.now(),
+        url: url,
+        width: 0,
+        height: 0,
+        isLocal: true,
+        file: file,
+      });
     }
   }
 };
@@ -818,7 +808,7 @@ const exportCanvasJSON = (): string => {
 
   const exportData = {
     version: '1.0',
-    imageUrl: hasLocalImage.value ? localImageUrl.value : (props.imageSource?.url || ''),
+    imageUrl: props.imageSource?.url || '',
     imageWidth: imageWidth.value,
     imageHeight: imageHeight.value,
     pointAnnotations: [...pointAnnotations.value],
@@ -1035,7 +1025,7 @@ const getMaskUIBlob = (layerValue?: string): Promise<Blob | null> => {
       const canvas = document.createElement('canvas');
       canvas.width = imageWidth.value || 0;
       canvas.height = imageHeight.value || 0;
-      const ctx = canvas.getContext('2d');
+      const ctx = canvas.getContext('2d', { willReadFrequently: true });
       if (!ctx) {
         resolve(null);
         return;
@@ -1078,7 +1068,7 @@ const getAllMaskBlobs = (
 const exportCOCO = (): string => {
   const coco = exportCOCOFormat(
     pointAnnotations.value,
-    hasLocalImage.value ? localImageUrl.value : (props.imageSource?.url || ''),
+    props.imageSource?.url || '',
     imageWidth.value || 0,
     imageHeight.value || 0
   );
@@ -1341,6 +1331,12 @@ onUnmounted(() => {
     hotkeysUnsubscribe();
     hotkeysUnsubscribe = null;
   }
+
+  // 清理未释放的 blob URL
+  for (const url of blobUrls) {
+    URL.revokeObjectURL(url);
+  }
+  blobUrls.clear();
 });
 
 // 工具切换函数
@@ -1991,6 +1987,20 @@ const clearAllAnnotationsAndBrush = () => {
   }
 };
 
+// 重置画布到初始化无图片状态
+const resetCanvas = () => {
+  clearAllAnnotationsAndBrush();
+  if (imageBox) {
+    contentLayer.clear();
+    imageBox.destroy();
+    imageBox = null;
+  }
+  if (commandManager) {
+    commandManager = new CommandManager(100);
+  }
+  loadStatus.value = 'idle';
+};
+
 // 清除当前图层的笔刷内容（仅当启用笔刷时）
 const clearBrush = () => {
   if (!effectiveEnableBrush.value) return;
@@ -2262,11 +2272,11 @@ defineExpose({
   exportCOCO,
   exportYOLO,
   importCanvasJSON,
-  loadImage,
   clearBrush,
   clearAllBrushLayers,
   clearAllAnnotations,
   clearAllAnnotationsAndBrush,
+  resetCanvas,
   zoomIn,
   zoomOut,
   resetZoom,
@@ -2288,9 +2298,6 @@ defineExpose({
   createBrushFromPoints,
   getBrushStyle: () => ({ ...localBrushStyle.value }),
   updateBrushStyle,
-  // 父组件可直接调用：弹出浏览器文件选择框，选择后自动加载到画布并重置标注
-  openFileDialog,
-  // 点标注双向联动能力
   setPointHoverState,
   setPointSelectState,
   findPointBySequenceNumber,

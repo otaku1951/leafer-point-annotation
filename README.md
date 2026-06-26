@@ -84,7 +84,7 @@ pnpm add @zzalai/leafer-point-annotation
 <template>
   <PointAnnotation
     ref="annotationRef"
-    :image-source="imageSource"
+    v-model:image-source="imageSource"
     :options="options"
     @point-change="handlePointChange"
     @load-success="handleLoadSuccess"
@@ -105,8 +105,8 @@ const imageSource = computed(() => ({
   url: 'https://example.com/sample.jpg'
 }))
 
-// 方式二：不传 imageSource，用户本地上传
-// const imageSource = null
+// 方式二：不传 imageSource（初始为 null），用户本地上传后自动绑定
+// const imageSource = ref<ImageSource | null>(null)
 
 const options = {
   enableBrush: true,
@@ -139,10 +139,16 @@ function handleLoadSuccess(info: any) {
 
 | 字段 | 类型 | 说明 |
 |------|------|------|
-| `url` | `string` | 图片地址（远程 URL 或 dataURL） |
+| `url` | `string` | 图片地址（远程 URL、dataURL 或 blob URL） |
 | `id` | `string` | 可选，业务标识 |
+| `width` | `number` | 图片宽度（加载成功后填充） |
+| `height` | `number` | 图片高度（加载成功后填充） |
+| `isLocal` | `boolean` | 是否为本地图片（本地选择时为 true） |
+| `file` | `File` | 原始文件对象（本地选择时有值，可直接用于后端 multipart 上传） |
 
-> 不传 `imageSource` 时，组件显示大面积上传区域，支持**点击选择文件**和**拖拽文件**两种本地加载方式。
+> **单一数据源**：图片加载完全依赖 `props.imageSource`。不传 `imageSource` 时，组件显示大面积上传区域，支持**点击选择文件**和**拖拽文件**两种本地加载方式。
+> 
+> **v-model 支持**：组件支持 `v-model:imageSource` 双向绑定，内部选择图片后自动更新父组件数据。
 
 ### options
 
@@ -158,7 +164,7 @@ interface OptionsSource {
                                             // true 时才绑定 v/p/b/e/Ctrl+Z 等快捷键
   brushCursorEnabled?: boolean             // 是否显示笔刷/橡皮擦的自定义跟随光标（默认 true）；
                                             // 切换到 brush/eraser 工具时光标显示为笔刷形状（颜色、大小、透明度实时同步）
-  loadingGradientColors?: [string, string]  // 加载中渐变动画的两个颜色（默认：淡紫 '#f0edff' -> 淡蓝 '#e6f0ff'）
+  loadingGradientColors?: [string, string]  // 加载中渐变动画的两个颜色（默认：淡紫 '#e8e0ff' -> 淡蓝 '#d8e8ff'）
   loadingTextColor?: string                // 加载中文字颜色（默认：'#4a5568'，蓝灰色，明显且不违和）
 
   // ============ UI 开关 ============
@@ -334,6 +340,7 @@ async function beforeCreatePoint(x: number, y: number, nx: number, ny: number, c
 | `redo-state-change` | `{ canRedo }` | 重做栈状态变化 |
 | `update:currentLayer` | `layerValue` | 当前笔刷图层变化（配合 v-model） |
 | `layer-change` | `layerValue` | 同 update:currentLayer |
+| `update:imageSource` | `ImageSource` | 组件内部选择图片后触发（配合 v-model:imageSource） |
 | `point-hover` | `(pointData, isHovering: boolean)` | 点 hover 状态变化：鼠标移入/移出某点时触发 |
 | `point-select` | `(pointData, isSelected: boolean)` | 点选中状态变化：点击选中/取消选中某点时触发 |
 
@@ -428,8 +435,9 @@ annotationRef.value?.getMaskBlob()                // 导出当前图层 Blob（�
 | 方法 | 说明 |
 |------|------|
 | `getImageInfo()` | `{ url, width, height, isLocal, file? }`（本地选图时有 `file` 原始 `File` 对象） |
-| `loadImage(url?: string)` | 动态加载一张新图片（不传参数时从 `imageSource` 读取）。切换图片时会**自动清空**之前的点标注、笔刷涂抹、并重置 undo/redo 栈 |
-| `openFileDialog()` | 弹出浏览器本地文件选择框，选图后内部自动调用 `loadImage(dataURL)`（父组件无需自行处理 FileReader） |
+| `resetCanvas()` | 重置画布到无图片初始化状态（清除所有标注、笔刷、撤销栈） |
+
+> **图片加载说明**：图片加载完全通过 `props.imageSource` 控制，不再对外暴露 `loadImage()` 和 `openFileDialog()` 方法。组件内部选择图片后通过 `v-model:imageSource` 自动同步到父组件。
 
 ### 工具切换
 
@@ -516,7 +524,7 @@ annotationRef.value?.getMaskBlob()                // 导出当前图层 Blob（�
 <template>
   <PointAnnotation
     ref="annotationRef"
-    :image-source="{ url: 'https://example.com/image.jpg' }"
+    v-model:image-source="imageSource"
     :options="{ enableBrush: false }"
   />
 </template>

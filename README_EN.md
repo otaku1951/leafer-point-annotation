@@ -89,7 +89,7 @@ pnpm add @zzalai/leafer-point-annotation
 <template>
   <PointAnnotation
     ref="annotationRef"
-    :image-source="imageSource"
+    v-model:image-source="imageSource"
     :options="options"
     @point-change="handlePointChange"
     @load-success="handleLoadSuccess"
@@ -144,10 +144,16 @@ function handleLoadSuccess(info: any) {
 
 | Field | Type | Description |
 |-------|------|-------------|
-| `url` | `string` | Image URL (remote URL or dataURL) |
+| `url` | `string` | Image URL (remote URL, dataURL, or blob URL) |
 | `id` | `string` | Optional, business identifier |
+| `width` | `number` | Image width (filled after loading) |
+| `height` | `number` | Image height (filled after loading) |
+| `isLocal` | `boolean` | Whether the image is from local upload |
+| `file` | `File` | Original file object (available for local uploads, can be used directly for backend multipart upload) |
 
-> When `imageSource` is not provided, the component displays a large upload area supporting **click to select** and **drag-and-drop** file loading.
+> **Single Data Source**: Image loading is fully controlled by `props.imageSource`. When not provided, the component displays a large upload area supporting **click to select** and **drag-and-drop** file loading.
+> 
+> **v-model Support**: The component supports `v-model:imageSource` for bidirectional binding. When the user selects an image internally, it automatically updates the parent component's data.
 
 ### options
 
@@ -329,12 +335,13 @@ Controlled layer switching. For example:
 |-------|-----------|----------------|
 | `point-change` | `(points: PointAnnotation[])` | Point added / deleted / modified / renumbered |
 | `load-start` | - | Image starts loading |
-| `load-success` | `{ url, width, height }` | Image loads successfully |
+| `load-success` | `{ url, width, height, isLocal, file? }` | Image loads successfully (`isLocal=true` for local uploads, `file` is the original File object) |
 | `load-error` | `{ error }` | Image loading fails |
 | `undo-state-change` | `{ canUndo }` | Undo stack state changes |
 | `redo-state-change` | `{ canRedo }` | Redo stack state changes |
 | `update:currentLayer` | `layerValue` | Current brush layer changes (use with v-model) |
 | `layer-change` | `layerValue` | Same as update:currentLayer |
+| `update:imageSource` | `ImageSource` | Triggered when image is selected internally (use with v-model:imageSource) |
 | `point-hover` | `(pointData, isHovering: boolean)` | Point hover state change: triggered when mouse enters/leaves a point |
 | `point-select` | `(pointData, isSelected: boolean)` | Point selection state change: triggered when a point is clicked to select/deselect |
 
@@ -428,9 +435,10 @@ annotationRef.value?.getMaskBlob()                  // Export current layer as B
 
 | Method | Description |
 |--------|-------------|
-| `getImageInfo()` | `{ url, width, height }` |
-| `loadImage(url?: string)` | Dynamically load a new image (reads from `imageSource` prop if no argument provided). Switching images **automatically clears** previous point annotations, brush strokes, and resets the undo/redo stack |
-| `openFileDialog()` | Opens the browser's local file picker. After selection, the component internally calls `loadImage(dataURL)` (parent component does NOT need to handle FileReader) |
+| `getImageInfo()` | `{ url, width, height, isLocal, file? }` (original `File` object available for local uploads) |
+| `resetCanvas()` | Reset canvas to no-image initialization state (clears all annotations, brush strokes, and undo/redo stack) |
+
+> **Image Loading Note**: Image loading is fully controlled by `props.imageSource`. The `loadImage()` and `openFileDialog()` methods are no longer exposed. When the user selects an image internally, it's automatically synced to the parent via `v-model:imageSource`.
 
 ### Tool Switching
 
@@ -517,7 +525,7 @@ annotationRef.value?.getMaskBlob()                  // Export current layer as B
 <template>
   <PointAnnotation
     ref="annotationRef"
-    :image-source="{ url: 'https://example.com/image.jpg' }"
+    v-model:image-source="imageSource"
     :options="{ enableBrush: false }"
   />
 </template>
