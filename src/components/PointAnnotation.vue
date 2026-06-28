@@ -1013,32 +1013,29 @@ const getMaskUIBlob = (layerValue?: string): Promise<Blob | null> => {
   
   if (!brush) return Promise.resolve(null);
   
+  const dataCanvas = brush.getDataCanvas().context.canvas;
+  const groupOpacity = (brush.getGroup() as any).opacity ?? 1;
+  const color = brush.getCurrentColor();
+  
+  const canvas = document.createElement('canvas');
+  canvas.width = imageWidth.value || 0;
+  canvas.height = imageHeight.value || 0;
+  const ctx = canvas.getContext('2d');
+  if (!ctx) return Promise.resolve(null);
+  
+  ctx.drawImage(dataCanvas, 0, 0);
+  
+  ctx.globalAlpha = groupOpacity;
+  ctx.globalCompositeOperation = 'source-in';
+  ctx.fillStyle = color;
+  ctx.fillRect(0, 0, canvas.width, canvas.height);
+  ctx.globalCompositeOperation = 'source-over';
+  ctx.globalAlpha = 1;
+  
   return new Promise((resolve) => {
-    const previewData = brush.getPreviewImageData?.();
-    if (!previewData) {
-      resolve(null);
-      return;
-    }
-    
-    const htmlImg = document.createElement('img');
-    htmlImg.onload = () => {
-      const canvas = document.createElement('canvas');
-      canvas.width = imageWidth.value || 0;
-      canvas.height = imageHeight.value || 0;
-      const ctx = canvas.getContext('2d', { willReadFrequently: true });
-      if (!ctx) {
-        resolve(null);
-        return;
-      }
-      ctx.drawImage(htmlImg, 0, 0);
-      canvas.toBlob((blob) => {
-        resolve(blob || null);
-      }, 'image/png');
-    };
-    htmlImg.onerror = () => {
-      resolve(null);
-    };
-    htmlImg.src = previewData;
+    canvas.toBlob((blob) => {
+      resolve(blob || null);
+    }, 'image/png');
   });
 };
 

@@ -1,6 +1,6 @@
 {
   "name": "@zzalai/leafer-point-annotation",
-  "version": "1.1.18",
+  "version": "1.1.19",
   "description": "A Vue3 component for point annotation and brush painting on images using LeaferJS, supporting COCO/YOLO/JSON export, designed for AI model training dataset annotation",
   "type": "module",
   "publishConfig": {

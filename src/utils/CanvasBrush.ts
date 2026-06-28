@@ -66,6 +66,10 @@ export class CanvasBrush {
     this.updatePreview();
   }
 
+  public getCurrentColor(): string {
+    return this.currentColor;
+  }
+
   public resetLastPoint(): void {
     this.lastPoint = null;
   }
