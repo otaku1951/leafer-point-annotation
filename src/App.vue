@@ -350,7 +350,7 @@ const baseOptions: OptionsSource = {
     opacity: 0.55,
     size: 100
   },
-  brushCursorEnabled: false
+  brushCursorEnabled: true
 }
 
 const showToolbar = ref(false)

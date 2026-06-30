@@ -552,6 +552,7 @@ watch(
 
 // 笔刷相关状态
 const isDrawing = ref(false);
+const isSpacePressed = ref(false);
 
 // 笔刷光标（跟随鼠标的预览圆圈）
 let brushCursorCircle: Ellipse | null = null;
@@ -1159,6 +1160,7 @@ onMounted(() => {
     commandManager = new CommandManager(100);
 
     window.addEventListener("keydown", handleKeyDown);
+    window.addEventListener("keyup", handleKeyUp);
     window.addEventListener("mousemove", handleMouseMove);
     window.addEventListener("focusout", handleFocusOut);
 
@@ -1278,12 +1280,20 @@ const isMouseInCanvas = (): boolean => {
 
 const handleKeyDown = (e: KeyboardEvent) => {
   if (e.code === "Space") {
+    isSpacePressed.value = true;
     if (isMouseInCanvas()) {
       e.preventDefault();
       return false;
     }
   }
 };
+
+const handleKeyUp = (e: KeyboardEvent) => {
+  if (e.code === "Space") {
+    isSpacePressed.value = false;
+  }
+};
+
 const handleFocusOut = (e: FocusEvent) => {
   const target = e.target;
   if (target instanceof HTMLElement && target.classList[0] === 'leafer-text-editor') {
@@ -1320,6 +1330,7 @@ onUnmounted(() => {
   app = null;
 
   window.removeEventListener("keydown", handleKeyDown);
+  window.removeEventListener("keyup", handleKeyUp);
   window.removeEventListener("mousemove", handleMouseMove);
   window.removeEventListener('focusout', handleFocusOut);
 
@@ -1618,6 +1629,7 @@ let brushSnapshotLayer: string | null = null;
 const handleBrushDown = (e: any) => {
   if (currentTool.value !== 'brush' && currentTool.value !== 'eraser') return;
   if (!app || !imageBox || !activeCanvasBrush.value) return;
+  if (isSpacePressed.value) return;
 
   isDrawing.value = true;
   brushSnapshotLayer = effectiveCurrentLayer.value;
@@ -1653,6 +1665,7 @@ const handleBrushDown = (e: any) => {
 
 const handleBrushMove = (e: any) => {
   if (!isDrawing.value || !activeCanvasBrush.value || !imageBox) return;
+  if (isSpacePressed.value) return;
 
   // 获取相对于图片的坐标（与点标注相同的方式）
   const point = contentLayer.getBoxPoint({ x: e.x, y: e.y });
