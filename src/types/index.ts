@@ -86,6 +86,7 @@ export interface BrushStyle {
   color: string;
   opacity: number;
   size: number;
+  eraserSize?: number; // 橡皮擦大小，未设置时使用 size
   minSize: number;
   maxSize: number;
   continuity: number; // 连续性阈值：两个点之间最大距离（像素），超过就用直线连接
@@ -169,6 +170,7 @@ export const DEFAULT_BRUSH_STYLE: BrushStyle = {
   color: 'rgba(255,0,0,1)',
   opacity: 0.55,
   size: 100,
+  eraserSize: 100, // 默认橡皮擦大小与笔刷一致
   minSize: 50,
   maxSize: 150,
   continuity: 28, // 默认连续性阈值：20像素

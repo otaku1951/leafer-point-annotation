@@ -68,7 +68,7 @@
 |------|------|------|
 | PointAnnotation | `src/components/PointAnnotation.vue` | **核心主组件**，近 1900 行，整合所有标注与笔刷能力 |
 | BrushSizeSlider | `src/components/BrushSizeSlider.vue` | 笔刷大小浮动滑块（由 BrushStylePanel 调用） |
-| BrushStylePanel | `src/components/BrushStylePanel.vue` | 笔刷样式配置面板（颜色、透明度、大小 slider、连续性） |
+| BrushStylePanel | `src/components/BrushStylePanel.vue` | 笔刷样式配置面板（颜色、透明度、笔刷大小、橡皮擦大小 slider、连续性） |
 
 ### 2.3 元素封装层 - LeaferJS 自定义元素
 
@@ -160,7 +160,7 @@ interface OptionsSource {
   // 点标注样式
   pointStyle?: Partial<PointStyle>
 
-  // 笔刷样式
+  // 笔刷样式（含独立橡皮擦尺寸 eraserSize）
   brushStyle?: Partial<BrushStyle>
 
   // 多图层笔刷（不传则单图层）

@@ -408,9 +408,17 @@ const localBrushStyle = ref<BrushStyle>({
   ...props.options?.brushStyle,
 });
 
+// 本地响应式橡皮擦大小（独立于笔刷大小）
+const localEraserSize = ref<number>(
+  props.options?.brushStyle?.eraserSize ?? localBrushStyle.value.size
+);
+
 // 监听 prop 变化，同步到本地状态
 watch(brushStyle, (newVal: BrushStyle) => {
   localBrushStyle.value = { ...newVal };
+  if (newVal.eraserSize !== undefined) {
+    localEraserSize.value = newVal.eraserSize;
+  }
 }, { immediate: true });
 
 // 监听笔刷透明度变化，更新所有图层的 CanvasBrush 透明度
@@ -423,12 +431,13 @@ watch(
   }
 );
 
-// 监听笔刷属性变化（颜色/大小/透明度），同步更新笔刷光标样式
+// 监听笔刷属性变化（颜色/大小/透明度/橡皮擦大小），同步更新笔刷光标样式
 watch(
   () => ({
     color: localBrushStyle.value.color,
     size: localBrushStyle.value.size,
     opacity: localBrushStyle.value.opacity,
+    eraserSize: localEraserSize.value,
   }),
   () => {
     updateBrushCursorStyle();
@@ -1399,6 +1408,9 @@ const closeBrushPanel = () => {
 const updateBrushStyle = (style: Partial<BrushStyle>) => {
   if (!effectiveEnableBrush.value) return;
   Object.assign(localBrushStyle.value, style);
+  if (style.eraserSize !== undefined) {
+    localEraserSize.value = style.eraserSize;
+  }
 };
 
 const eraserTool = () => {
@@ -1439,10 +1451,11 @@ const createBrushCursor = () => {
 
   // 核心圆圈
   const style = localBrushStyle.value;
+  const toolSize = currentTool.value === 'eraser' ? localEraserSize.value : style.size;
   brushCursorCircle = new Ellipse({
     around: 'center',
-    width: style.size,
-    height: style.size,
+    width: toolSize,
+    height: toolSize,
     fill: style.color,
     stroke: style.color,
     strokeWidth: 1,
@@ -1483,8 +1496,8 @@ const updateBrushCursorStyle = () => {
   } else if (tool === 'eraser') {
     // 橡皮擦模式：空心黑白双环，保证在任何背景下可见
     brushCursorCircle.set({
-      width: style.size,
-      height: style.size,
+      width: localEraserSize.value,
+      height: localEraserSize.value,
       fill: 'transparent',
       stroke: '#ffffff',
       strokeWidth: 2,
@@ -1647,7 +1660,7 @@ const handleBrushDown = (e: any) => {
 
   // 根据模式绘制到当前激活图层
   if (isErase) {
-    activeCanvasBrush.value.erase(point.x, point.y, localBrushStyle.value.size, localBrushStyle.value.continuity);
+    activeCanvasBrush.value.erase(point.x, point.y, localEraserSize.value, localBrushStyle.value.continuity);
   } else {
     activeCanvasBrush.value.draw(
       point.x,
@@ -1675,7 +1688,7 @@ const handleBrushMove = (e: any) => {
 
   // 根据模式绘制到当前激活图层
   if (isErase) {
-    activeCanvasBrush.value.erase(point.x, point.y, localBrushStyle.value.size, localBrushStyle.value.continuity);
+    activeCanvasBrush.value.erase(point.x, point.y, localEraserSize.value, localBrushStyle.value.continuity);
   } else {
     activeCanvasBrush.value.draw(
       point.x,

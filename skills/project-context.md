@@ -130,7 +130,7 @@ interface OptionsSource {
   pointStyle?: Partial<PointStyle>          // circleFill, circleStroke, hover*, selected*, label*, fixedSizeOnZoom 等
 
   // 笔刷样式（覆盖默认）
-  brushStyle?: Partial<BrushStyle>          // color, opacity, size, minSize, maxSize, continuity
+  brushStyle?: Partial<BrushStyle>          // color, opacity, size, eraserSize?, minSize, maxSize, continuity
 
   // 多图层配置（不传则单图层 'default'）
   brushLayers?: BrushLayerConfig[]          // [{label, value, color?, opacity?, size?}]
@@ -158,7 +158,7 @@ interface PointStyle {
 }
 
 interface BrushStyle {
-  color, opacity, size, minSize, maxSize, continuity
+  color, opacity, size, eraserSize?, minSize, maxSize, continuity
 }
 
 interface BrushLayerConfig {

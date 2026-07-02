@@ -122,7 +122,8 @@ const options = {
   brushStyle: {
     color: '#1890ff',
     opacity: 0.55,
-    size: 100
+    size: 100,
+    eraserSize: 150  // Eraser size (optional, defaults to brush size if not set)
   }
 }
 
@@ -239,11 +240,14 @@ interface BrushStyle {
   color: string                             // Brush color (hex)
   opacity: number                           // Opacity 0~1 (controlled via Group.opacity)
   size: number                              // Brush size (pixels)
+  eraserSize?: number                       // Eraser size (pixels), uses size if not set
   minSize: number                           // Slider minimum
   maxSize: number                           // Slider maximum
   continuity: number                        // Maximum distance threshold for continuous strokes
 }
 ```
+
+> **Independent Eraser Size**: `eraserSize` allows configuring the eraser size independently from the brush size. When not set, it defaults to the same value as `size`. The brush configuration panel provides separate sliders for "Brush Size" and "Eraser Size".
 
 #### BrushLayerConfig (Multi-layer Configuration)
 

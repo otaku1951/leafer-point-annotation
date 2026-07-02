@@ -45,7 +45,7 @@
         
         <!-- 大小 -->
         <div class="config-item">
-          <label class="config-label">大小:</label>
+          <label class="config-label">笔刷大小:</label>
           <input 
             type="range" 
             class="config-slider"
@@ -54,6 +54,19 @@
             :max="brushStyle.maxSize" 
           />
           <span class="config-value">{{ localSize }}</span>
+        </div>
+        
+        <!-- 橡皮擦大小 -->
+        <div class="config-item">
+          <label class="config-label">橡皮擦大小:</label>
+          <input 
+            type="range" 
+            class="config-slider"
+            v-model.number="localEraserSize" 
+            :min="brushStyle.minSize" 
+            :max="brushStyle.maxSize" 
+          />
+          <span class="config-value">{{ localEraserSize }}</span>
         </div>
         
         <!-- 连续性 -->
@@ -99,6 +112,7 @@ const predefinedColors = [
 const localColor = ref(props.brushStyle.color);
 const localOpacity = ref(props.brushStyle.opacity);
 const localSize = ref(props.brushStyle.size);
+const localEraserSize = ref(props.brushStyle.eraserSize ?? props.brushStyle.size);
 const localContinuity = ref(props.brushStyle.continuity);
 
 // 监听props变化（包括组件重新创建时立即执行）
@@ -106,6 +120,7 @@ watch(() => props.brushStyle, (newVal) => {
   localColor.value = newVal.color;
   localOpacity.value = newVal.opacity;
   localSize.value = newVal.size;
+  localEraserSize.value = newVal.eraserSize ?? newVal.size;
   localContinuity.value = newVal.continuity;
 }, { deep: true, immediate: true });
 
@@ -138,11 +153,12 @@ const notifyUpdate = () => {
     color: color,
     opacity: localOpacity.value,
     size: localSize.value,
+    eraserSize: localEraserSize.value,
     continuity: localContinuity.value,
   });
 };
 
-watch([localColor, localOpacity, localSize, localContinuity], () => {
+watch([localColor, localOpacity, localSize, localEraserSize, localContinuity], () => {
   notifyUpdate();
 });
 

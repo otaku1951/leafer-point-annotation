@@ -117,7 +117,8 @@ const options = {
   brushStyle: {
     color: '#1890ff',
     opacity: 0.55,
-    size: 100
+    size: 100,
+    eraserSize: 150  // 橡皮擦大小（可选，未设置时与笔刷大小一致）
   }
 }
 
@@ -238,11 +239,14 @@ interface BrushStyle {
   color: string                             // 笔刷颜色（十六进制）
   opacity: number                           // 透明度 0~1（通过 Group.opacity 控制）
   size: number                              // 笔刷大小（像素）
+  eraserSize?: number                       // 橡皮擦大小（像素），未设置时使用 size
   minSize: number                           // 滑块最小
   maxSize: number                           // 滑块最大
   continuity: number                        // 两点间最大距离阈值（超过则断开）
 }
 ```
+
+> **橡皮擦独立尺寸**：`eraserSize` 用于独立配置橡皮擦尺寸，与笔刷尺寸分离。未设置时默认与 `size` 相同。笔刷配置面板中分别提供「笔刷大小」和「橡皮擦大小」两个滑块。
 
 #### BrushLayerConfig（多图层配置）
 
