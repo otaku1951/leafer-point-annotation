@@ -42,7 +42,8 @@
 ┌─────────────────┐ ┌─────────────────┐ ┌──────────────────┐
 │   元素封装层    │ │   工具类层       │ │   类型定义层     │
 │ PointAnnotation │ │ CanvasBrush.ts   │ │  types/index.ts  │
-│ Element.ts      │ │ BrushCommands.ts │ │                  │
+│ Element.ts      │ │ LassoOverlay.ts  │ │                  │
+│                 │ │ BrushCommands.ts │ │                  │
 │                 │ │ PointCommands.ts │ │                  │
 │                 │ │ BrushStroke.ts   │ │                  │
 │                 │ │ COCOExporter.ts  │ │                  │
@@ -81,6 +82,7 @@
 | 文件 | 职责 |
 |------|------|
 | `src/utils/CanvasBrush.ts` | 笔刷底层：每个图层一个实例，含 canvas/ctx、stroke/clear/fillPolygon/getImageData/hasContent/getGroup 等 |
+| `src/utils/LassoOverlay.ts` | 套索工具：自由绘制闭合区域，黑白双线高对比度轨迹，支持固定屏幕大小 |
 | `src/utils/BrushCommands.ts` | 笔刷相关命令（撤销/重做用）：`BrushSnapshotCommand` 基于 ImageData 快照 |
 | `src/utils/PointCommands.ts` | 点标注相关命令：`AddPointCommand`、`RemovePointCommand` |
 | `src/utils/BrushStroke.ts` | 笔刷笔画数据结构与辅助函数（已由 CanvasBrush 接管核心绘制，主要供数据导出用） |
@@ -91,7 +93,7 @@
 
 | 文件 | 职责 |
 |------|------|
-| `src/types/index.ts` | **所有对外接口集中地**：`PointAnnotation`、`PointStyle`、`BrushLayerConfig`、`BrushStyle`、`BrushStrokeData`、`ToolType`、`ExportFormat`、`ExportOptions`、`Statistics`、`ExportData`，以及 `DEFAULT_POINT_STYLE` / `DEFAULT_BRUSH_STYLE` |
+| `src/types/index.ts` | **所有对外接口集中地**：`PointAnnotation`、`PointStyle`、`BrushLayerConfig`、`BrushStyle`（含独立橡皮擦尺寸 `eraserSize`）、`BrushStrokeData`、`ToolType`（'select' \| 'point' \| 'brush' \| 'eraser' \| 'lasso'）、`ExportFormat`、`ExportOptions`、`Statistics`、`ExportData`，以及 `DEFAULT_POINT_STYLE` / `DEFAULT_BRUSH_STYLE` |
 
 ---
 
@@ -193,6 +195,7 @@ interface OptionsSource {
   enableHotkeys?: boolean       // 默认 false；设为 true 时才绑定 tinykeys 快捷键
                                 //   (v/p/b/e/Ctrl+Z/Ctrl+Y/Delete/Ctrl+±/Ctrl+0/Alt)
   brushCursorEnabled?: boolean // 默认 true；设为 false 时禁用笔刷/橡皮擦的自定义跟随光标
+  lassoFixedSizeOnZoom?: boolean // 默认 true；套索轨迹是否保持固定屏幕大小（不随画布缩放变粗）
   loadingGradientColors?: [string, string]  // 加载中渐变动画两个颜色（默认：淡紫 -> 淡蓝）
   loadingTextColor?: string    // 加载中文字颜色（默认：#4a5568）
 }
@@ -247,10 +250,10 @@ App (leafer-ui)
 | `getImageInfo()` | 返回 `{ url, width, height, isLocal, file? }`（本地选图时有 `file` 原始 `File` 对象） |
 | `resetCanvas()` | 重置画布到无图片初始化状态（清除所有标注、笔刷、撤销栈） |
 | **工具切换** | |
-| `getCurrentTool()` | 返回 `'select'/'point'/'brush'/'eraser'` |
+| `getCurrentTool()` | 返回 `'select'/'point'/'brush'/'eraser'/'lasso'` |
 | `setTool(tool)` | 切到指定工具（受 enableBrush 限制） |
 | `selectTool()` / `pointTool()` | |
-| `brushTool(openPanel?)` / `eraserTool()` | |
+| `brushTool(openPanel?)` / `eraserTool()` / `lassoTool()` | |
 | **删除 / 清空** | |
 | `deleteSelected()` | 删除当前选中的标注点 |
 | `clearAllAnnotationsAndBrush()` | 清空所有点 + 笔刷（带确认） |

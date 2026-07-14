@@ -5,7 +5,8 @@ English | [中文](README.md)
 > A point annotation and brush painting tool based on **Vue 3 + LeaferJS**, supporting COCO/YOLO/JSON/Mask export, designed for AI model training dataset annotation.
 
 - 📍 **Point Annotation** - Draggable, editable points with auto-renumbering and hover/selected states
-- 🖌️ **Multi-layer Brush Painting** - Painting and erasing with adjustable color, opacity, size, and continuity
+- 🖌️ **Multi-layer Brush Painting** - Painting and erasing with adjustable color, opacity, size, and continuity (independent eraser size)
+- 🪢 **Lasso Tool** - Freehand closed region drawing for fill/erase with high-contrast black-and-white path
 - 🔀 **Brush Polygon from Points** - One-click generation of brush polygon area from point annotation trajectory
 - 🖼️ **Local Image Upload** - Click to select or drag-and-drop local images, or use remote image URLs
 - 🎨 **Complete Style Customization** - Full point and brush style configuration
@@ -47,6 +48,7 @@ English | [中文](README.md)
   - [Multi-layer Brush](#multi-layer-brush)
   - [Backend Upload Mask (Blob/File)](#backend-upload-mask-blobfile)
   - [Point-Only Annotation (Disable Brush)](#point-only-annotation-disable-brush)
+  - [Lasso Tool (Freehand Closed Region)](#lasso-tool-freehand-closed-region)
   - [Pre-create Callback (beforeCreatePoint)](#pre-create-callback-beforecreatepoint)
 - [Keyboard Shortcuts](#keyboard-shortcuts)
 - [Development & Build](#development--build)
@@ -168,6 +170,10 @@ interface OptionsSource {
                                             // and brushTool/eraserTool/mask export methods are disabled
   enableHotkeys?: boolean                   // Whether to enable keyboard shortcuts (default: false);
                                             // Shortcuts v/p/b/e/Ctrl+Z are only bound when true
+  brushCursorEnabled?: boolean             // Whether to show custom brush/eraser cursor (default: true);
+                                            // Cursor shows brush shape when switching to brush/eraser tool
+  lassoFixedSizeOnZoom?: boolean           // Whether lasso path stays fixed size (doesn't thicken with canvas zoom, default: true);
+                                            // Black main line + white outline for high contrast on any background
 
   // ============ UI Toggles ============
   showToolbar?: boolean                     // Whether to show built-in toolbar (default: true)
@@ -248,6 +254,8 @@ interface BrushStyle {
 ```
 
 > **Independent Eraser Size**: `eraserSize` allows configuring the eraser size independently from the brush size. When not set, it defaults to the same value as `size`. The brush configuration panel provides separate sliders for "Brush Size" and "Eraser Size".
+>
+> **Eraser Cursor Style**: Uses a double-ring design with 2px white outer ring + 1px black inner ring (similar to Photoshop), ensuring visibility on both light and dark backgrounds. No additional configuration required.
 
 #### BrushLayerConfig (Multi-layer Configuration)
 
@@ -368,7 +376,7 @@ import type {
   BrushStyle,            // Brush style config
   BrushLayerConfig,      // Multi-layer config item
   BrushStrokeData,       // Brush stroke data
-  ToolType,              // 'select' | 'point' | 'brush' | 'eraser'
+  ToolType,              // 'select' | 'point' | 'brush' | 'eraser' | 'lasso'
   ExportFormat,          // Export format
   ExportOptions,         // Export options
   ImportOptions,         // Import options
@@ -448,12 +456,13 @@ annotationRef.value?.getMaskBlob()                  // Export current layer as B
 
 | Method | Description |
 |--------|-------------|
-| `getCurrentTool(): 'select' \| 'point' \| 'brush' \| 'eraser'` | - |
-| `setTool(tool)` | Switch to specified tool (brush/eraser blocked when `enableBrush=false`) |
+| `getCurrentTool(): 'select' \| 'point' \| 'brush' \| 'eraser' \| 'lasso'` | - |
+| `setTool(tool)` | Switch to specified tool (brush/eraser/lasso blocked when `enableBrush=false`) |
 | `selectTool()` | Select tool |
 | `pointTool()` | Point annotation tool |
 | `brushTool(openPanel?: boolean)` | Brush tool |
 | `eraserTool()` | Eraser tool |
+| `lassoTool()` | Lasso tool |
 
 ### Delete & Clear
 
@@ -667,6 +676,45 @@ function handlePoints(points: any[]) {
 </script>
 ```
 
+### Lasso Tool (Freehand Closed Region)
+
+The lasso tool is used to freely draw closed regions and automatically fill/erase them. It shares color, opacity, and layer settings with the brush, and supports undo/redo.
+
+```vue
+<template>
+  <PointAnnotation
+    ref="annotationRef"
+    :image-source="{ url: '...' }"
+    :options="{
+      enableBrush: true,
+      lassoFixedSizeOnZoom: true,  // Lasso path stays fixed screen size (default: true)
+      brushStyle: {
+        color: '#1890ff',
+        opacity: 0.55,
+        size: 100,
+      }
+    }"
+  />
+</template>
+
+<script setup lang="ts">
+import { ref } from 'vue'
+import PointAnnotation from '@zzalai/leafer-point-annotation'
+import '@zzalai/leafer-point-annotation/dist/leafer-point-annotation.css'
+
+const annotationRef = ref<InstanceType<typeof PointAnnotation> | null>(null)
+
+// Programmatically switch to lasso tool
+function useLasso() {
+  annotationRef.value?.lassoTool()
+}
+</script>
+```
+
+> **Lasso Path Style**: High-contrast design with 1px black main line + 3px white outline, ensuring visibility on both light and dark backgrounds.
+>
+> **`lassoFixedSizeOnZoom`**: Controls whether the lasso path thickens with canvas zoom. Default `true` (fixed screen pixel size, similar to point annotation's `fixedSizeOnZoom`). Set to `false` for line width to scale with canvas zoom.
+
 ### Pre-create Callback (beforeCreatePoint)
 
 ```vue
@@ -864,6 +912,7 @@ onUnmounted(() => { window.removeEventListener('keydown', onAppKeyDown) })
 | `p` | Point annotation tool | Requires `enableHotkeys=true` |
 | `b` | Brush tool | Requires `enableHotkeys=true` + `enableBrush=true` |
 | `e` | Eraser tool | Requires `enableHotkeys=true` + `enableBrush=true` |
+| `l` | Lasso tool | Requires `enableHotkeys=true` + `enableBrush=true` |
 | `Ctrl + Z` | Undo | Requires `enableHotkeys=true` |
 | `Ctrl + Y` | Redo | Requires `enableHotkeys=true` |
 | `Delete` | Delete selected point | Requires `enableHotkeys=true` |
@@ -908,6 +957,7 @@ src/
 │   └── PointAnnotationElement.ts  # Custom point element (Group + Ellipse + Text)
 ├── utils/
 │   ├── CanvasBrush.ts             # Brush core (canvas + drawing snapshot)
+│   ├── LassoOverlay.ts            # Lasso tool (freehand closed region, high-contrast black-white path)
 │   ├── BrushCommands.ts           # Brush undo commands
 │   ├── PointCommands.ts           # Point undo commands
 │   ├── BrushStroke.ts             # Brush stroke data

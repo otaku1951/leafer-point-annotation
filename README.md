@@ -5,7 +5,8 @@
 > 基于 **Vue 3 + LeaferJS** 的图像点标注与笔刷涂抹工具，支持导出 COCO/YOLO/JSON 格式，专为 AI 模型训练数据集标注设计。
 
 - 📍 点标注（可拖拽、可编辑、自动重排、hover/selected 状态）
-- 🖌️ 多图层笔刷涂抹与擦除（颜色、透明度、大小、连续性可调）
+- 🖌️ 多图层笔刷涂抹与擦除（颜色、透明度、大小、连续性可调，橡皮擦独立尺寸）
+- 🪢 套索工具（自由绘制闭合区域进行填充/擦除，轨迹黑白双线高对比度）
 - 🔀 一键根据点标注的轨迹生成笔刷多边形区域
 - 🖼️ 本地图片上传（点击 + 拖拽）或远程图片
 - 🎨 完整的点/笔刷样式自定义
@@ -47,6 +48,7 @@
   - [多图层笔刷](#多图层笔刷)
   - [后端上传 Mask（Blob/File）](#后端上传-mask-blobfile)
   - [只启用点标注（禁用笔刷）](#只启用点标注禁用笔刷)
+  - [套索工具（自由绘制闭合区域）](#套索工具自由绘制闭合区域)
   - [点标注前回调（beforeCreatePoint）](#点标注前回调beforecreatepoint)
 - [快捷键](#快捷键)
 - [开发与构建](#开发与构建)
@@ -165,6 +167,8 @@ interface OptionsSource {
                                             // true 时才绑定 v/p/b/e/Ctrl+Z 等快捷键
   brushCursorEnabled?: boolean             // 是否显示笔刷/橡皮擦的自定义跟随光标（默认 true）；
                                             // 切换到 brush/eraser 工具时光标显示为笔刷形状（颜色、大小、透明度实时同步）
+  lassoFixedSizeOnZoom?: boolean           // 套索轨迹是否保持固定大小（不随画布缩放而变粗，默认 true）；
+                                            // 黑色主线 + 白色描边，高对比度适应各种背景
   loadingGradientColors?: [string, string]  // 加载中渐变动画的两个颜色（默认：淡紫 '#e8e0ff' -> 淡蓝 '#d8e8ff'）
   loadingTextColor?: string                // 加载中文字颜色（默认：'#4a5568'，蓝灰色，明显且不违和）
 
@@ -247,6 +251,8 @@ interface BrushStyle {
 ```
 
 > **橡皮擦独立尺寸**：`eraserSize` 用于独立配置橡皮擦尺寸，与笔刷尺寸分离。未设置时默认与 `size` 相同。笔刷配置面板中分别提供「笔刷大小」和「橡皮擦大小」两个滑块。
+>
+> **橡皮擦光标样式**：采用白色 2px 外圈 + 黑色 1px 内圈的双环设计（类似 Photoshop），无论浅色还是深色背景都清晰可见，无需额外配置。
 
 #### BrushLayerConfig（多图层配置）
 
@@ -367,7 +373,7 @@ import type {
   BrushStyle,            // 笔刷样式配置
   BrushLayerConfig,      // 多图层配置项
   BrushStrokeData,       // 笔刷笔画数据
-  ToolType,              // 'select' | 'point' | 'brush' | 'eraser'
+  ToolType,              // 'select' | 'point' | 'brush' | 'eraser' | 'lasso'
   ExportFormat,          // 导出格式
   ExportOptions,         // 导出选项
   ImportOptions,         // 导入选项
@@ -447,12 +453,13 @@ annotationRef.value?.getMaskBlob()                // 导出当前图层 Blob（�
 
 | 方法 | 说明 |
 |------|------|
-| `getCurrentTool(): 'select' \| 'point' \| 'brush' \| 'eraser'` | - |
-| `setTool(tool)` | 切换到指定工具（`enableBrush=false` 时 brush/eraser 被拦截） |
+| `getCurrentTool(): 'select' \| 'point' \| 'brush' \| 'eraser' \| 'lasso'` | - |
+| `setTool(tool)` | 切换到指定工具（`enableBrush=false` 时 brush/eraser/lasso 被拦截） |
 | `selectTool()` | 选择工具 |
 | `pointTool()` | 点标注工具 |
 | `brushTool(openPanel?: boolean)` | 笔刷工具 |
 | `eraserTool()` | 橡皮擦工具 |
+| `lassoTool()` | 套索工具 |
 
 ### 删除 & 清空
 
@@ -666,6 +673,45 @@ function handlePoints(points: any[]) {
 </script>
 ```
 
+### 套索工具（自由绘制闭合区域）
+
+套索工具用于自由绘制闭合区域并自动填充/擦除，与笔刷共享颜色、透明度和图层设置，支持撤销/重做。
+
+```vue
+<template>
+  <PointAnnotation
+    ref="annotationRef"
+    :image-source="{ url: '...' }"
+    :options="{
+      enableBrush: true,
+      lassoFixedSizeOnZoom: true,  // 套索轨迹保持固定屏幕大小（默认 true）
+      brushStyle: {
+        color: '#1890ff',
+        opacity: 0.55,
+        size: 100,
+      }
+    }"
+  />
+</template>
+
+<script setup lang="ts">
+import { ref } from 'vue'
+import PointAnnotation from '@zzalai/leafer-point-annotation'
+import '@zzalai/leafer-point-annotation/dist/leafer-point-annotation.css'
+
+const annotationRef = ref<InstanceType<typeof PointAnnotation> | null>(null)
+
+// 程序化切换到套索工具
+function useLasso() {
+  annotationRef.value?.lassoTool()
+}
+</script>
+```
+
+> **套索轨迹样式**：采用黑色 1px 主线 + 白色 3px 描边的高对比度设计，无论浅色还是深色背景都清晰可见。
+>
+> **`lassoFixedSizeOnZoom`**：控制套索轨迹是否随画布缩放而变粗。默认 `true`（固定屏幕像素大小，类似标注点的 `fixedSizeOnZoom`），设为 `false` 则线宽随画布缩放变化。
+
 ### 点标注前回调（beforeCreatePoint）
 
 ```vue
@@ -865,6 +911,7 @@ onUnmounted(() => { window.removeEventListener('keydown', onAppKeyDown) })
 | `p` | 点标注工具 | 需 `enableHotkeys=true` |
 | `b` | 笔刷工具 | 需 `enableHotkeys=true` + `enableBrush=true` |
 | `e` | 橡皮擦工具 | 需 `enableHotkeys=true` + `enableBrush=true` |
+| `l` | 套索工具 | 需 `enableHotkeys=true` + `enableBrush=true` |
 | `Ctrl + Z` | 撤销 | 需 `enableHotkeys=true` |
 | `Ctrl + Y` | 重做 | 需 `enableHotkeys=true` |
 | `Delete` | 删除选中的点 | 需 `enableHotkeys=true` |
@@ -909,6 +956,7 @@ src/
 │   └── PointAnnotationElement.ts  # 自定义点元素（Group + Ellipse + Text）
 ├── utils/
 │   ├── CanvasBrush.ts             # 笔刷底层（canvas + 绘制快照）
+│   ├── LassoOverlay.ts            # 套索工具（自由绘制闭合区域，黑白双线高对比度）
 │   ├── BrushCommands.ts           # 笔刷撤销命令
 │   ├── PointCommands.ts           # 点撤销命令
 │   ├── BrushStroke.ts             # 笔画数据

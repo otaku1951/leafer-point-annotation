@@ -96,13 +96,17 @@
 | P2-006 | 笔刷连续性阈值 `continuity`：超过则不连线 | ⭐⭐ | ✅ |
 | P2-006-1 | 橡皮擦独立尺寸：`brushStyle.eraserSize` 独立配置橡皮擦大小，与笔刷尺寸分离 | ⭐⭐ | ✅ |
 | P2-007 | 实时预览涂抹效果（canvas 即时渲染） | ⭐⭐⭐ | ✅ |
-| P2-008 | 清空当前图层笔刷：`clearBrush()` | ⭐⭐⭐ | ✅ |
-| P2-009 | 清空所有图层笔刷：`clearAllBrushLayers()` | ⭐⭐⭐ | ✅ |
-| P2-010 | 多图层笔刷：通过 `options.brushLayers` 配置多个图层（`{label, value, color?, opacity?, size?}`） | ⭐⭐⭐ | ✅ |
-| P2-011 | 默认单图层：不传 brushLayers 时自动创建 `{label:'默认图层', value:'default'}` | ⭐⭐⭐ | ✅ |
-| P2-012 | 图层切换：`setActiveLayer(value)` 或通过 `v-model:currentLayer` 受控驱动 | ⭐⭐⭐ | ✅ |
-| P2-013 | `effectiveCurrentLayer` / `activeCanvasBrush` 为运行时当前笔刷的入口 | ⭐⭐⭐ | ✅ |
-| P2-014 | 笔刷撤销/重做：基于 ImageData 快照（BrushSnapshotCommand） | ⭐⭐⭐ | ✅ |
+| P2-008 | 套索工具：自由绘制闭合区域进行填充/擦除，与笔刷共享颜色、透明度、图层设置 | ⭐⭐⭐ | ✅ |
+| P2-009 | 套索轨迹采用黑色 1px 主线 + 白色 3px 描边的高对比度设计，适应各种背景 | ⭐⭐ | ✅ |
+| P2-010 | `lassoFixedSizeOnZoom` 配置：套索轨迹是否保持固定屏幕大小（不随画布缩放变粗），默认 true | ⭐⭐ | ✅ |
+| P2-011 | 橡皮擦光标采用白色 2px 外圈 + 黑色 1px 内圈的双环设计（类似 Photoshop），适应各种背景 | ⭐⭐ | ✅ |
+| P2-012 | 清空当前图层笔刷：`clearBrush()` | ⭐⭐⭐ | ✅ |
+| P2-013 | 清空所有图层笔刷：`clearAllBrushLayers()` | ⭐⭐⭐ | ✅ |
+| P2-014 | 多图层笔刷：通过 `options.brushLayers` 配置多个图层（`{label, value, color?, opacity?, size?}`） | ⭐⭐⭐ | ✅ |
+| P2-015 | 默认单图层：不传 brushLayers 时自动创建 `{label:'默认图层', value:'default'}` | ⭐⭐⭐ | ✅ |
+| P2-016 | 图层切换：`setActiveLayer(value)` 或通过 `v-model:currentLayer` 受控驱动 | ⭐⭐⭐ | ✅ |
+| P2-017 | `effectiveCurrentLayer` / `activeCanvasBrush` 为运行时当前笔刷的入口 | ⭐⭐⭐ | ✅ |
+| P2-018 | 笔刷撤销/重做：基于 ImageData 快照（BrushSnapshotCommand） | ⭐⭐⭐ | ✅ |
 
 ### 2.4 enableBrush 功能开关（P3-XXX）
 
@@ -154,14 +158,14 @@
 
 | 编号 | 功能描述 | 优先级 | 状态 |
 |------|----------|--------|------|
-| P6-001 | 默认工具栏含：select、point、brush、eraser、delete、clear、undo、redo 按钮 | ⭐⭐⭐ | ✅ |
+| P6-001 | 默认工具栏含：select、point、brush、eraser、lasso、delete、clear、undo、redo 按钮 | ⭐⭐⭐ | ✅ |
 | P6-002 | `options.showToolbar = false` 可隐藏默认工具栏 | ⭐⭐⭐ | ✅ |
 | P6-003 | `options.showZoomController = false` 可隐藏缩放控制器 | ⭐⭐⭐ | ✅ |
 | P6-004 | 父组件可通过 `ref` 调用暴露的方法自定义工具栏 | ⭐⭐⭐ | ✅ |
-| P6-005 | 快捷键 `v` 选择工具 / `p` 点工具 / `b` 笔刷 / `e` 橡皮 / `Ctrl+Z` 撤销 / `Ctrl+Y` 重做 / `Delete` 删除选中 / `Ctrl++` 放大 / `Ctrl+-` 缩小 / `Ctrl+0` 重置 | ⭐⭐⭐ | ✅ |
+| P6-005 | 快捷键 `v` 选择工具 / `p` 点工具 / `b` 笔刷 / `e` 橡皮 / `l` 套索 / `Ctrl+Z` 撤销 / `Ctrl+Y` 重做 / `Delete` 删除选中 / `Ctrl++` 放大 / `Ctrl+-` 缩小 / `Ctrl+0` 重置 | ⭐⭐⭐ | ✅ |
 | P6-006 | 快捷键生效条件：画布 focus 或鼠标 hover 画布 | ⭐⭐⭐ | ✅ |
 | P6-007 | `Alt` 键显示/隐藏快捷键提示浮层 | ⭐⭐ | ✅ |
-| P6-008 | `b` / `e` 快捷键受 `enableBrush` 限制 | ⭐⭐⭐ | ✅ |
+| P6-008 | `b` / `e` / `l` 快捷键受 `enableBrush` 限制 | ⭐⭐⭐ | ✅ |
 
 ### 2.8 撤销与重做（P7-XXX）
 
@@ -172,8 +176,9 @@
 | P7-003 | 笔刷绘制：通过 BrushSnapshotCommand 进栈（基于 ImageData 快照） | ⭐⭐⭐ | ✅ |
 | P7-004 | 笔刷擦除：同上 | ⭐⭐⭐ | ✅ |
 | P7-005 | 点轨迹生成笔刷：同上 | ⭐⭐⭐ | ✅ |
-| P7-006 | 最大 undo 步数：可配置（options.maxUndoSteps），默认 100 | ⭐⭐ | ✅ |
-| P7-007 | `undoStateChange` / `redoStateChange` 事件供父组件监听 undo/redo 是否可继续 | ⭐⭐ | ✅ |
+| P7-006 | 套索填充/擦除：同上 | ⭐⭐⭐ | ✅ |
+| P7-007 | 最大 undo 步数：可配置（options.maxUndoSteps），默认 100 | ⭐⭐ | ✅ |
+| P7-008 | `undoStateChange` / `redoStateChange` 事件供父组件监听 undo/redo 是否可继续 | ⭐⭐ | ✅ |
 
 ### 2.9 缩放与视口（P8-XXX）
 
@@ -192,7 +197,7 @@
 |------|-----------|
 | 点标注 | `getPointAnnotations`, `createPointAnnotation`, `removePointAnnotation`, `updatePointAnnotationLabel` |
 | 图片 & 画布 | `getImageInfo`, `loadImage` |
-| 工具切换 | `getCurrentTool`, `setTool`, `selectTool`, `pointTool`, `brushTool`, `eraserTool` |
+| 工具切换 | `getCurrentTool`, `setTool`, `selectTool`, `pointTool`, `brushTool`, `eraserTool`, `lassoTool` |
 | 删除 / 清空 | `deleteSelected`, `clearAllAnnotationsAndBrush`, `clearBrush`, `clearAllBrushLayers` |
 | 笔刷图层 | `getCurrentLayer`, `setActiveLayer`, `getAllLayers` |
 | 笔刷样式 | `getBrushStyle`, `updateBrushStyle` |
@@ -234,6 +239,8 @@
 | C-006 | 笔刷撤销基于 ImageData 快照；对超大图片，单张快照 ~4*W*H 字节，maxUndoSteps 不宜过大 | 性能注意 |
 | C-007 | Mask 导出格式 png/jpeg，jpeg 会丢失透明度（建议 png 用于二值图） | 导出注意 |
 | C-008 | getMaskBlob/getMaskFile/getAllMaskBlobs 基于 HTMLCanvasElement.toBlob，必须在浏览器环境（不支持 SSR） | 服务端渲染不适用 |
+| C-009 | 套索工具与笔刷共享颜色、透明度、图层设置，使用同一套撤销/重做机制 | 套索本质是笔刷的另一种绘制方式 |
+| C-010 | 套索轨迹默认固定屏幕大小（`lassoFixedSizeOnZoom=true`），与标注点 `fixedSizeOnZoom` 概念一致 | 可通过配置关闭 |
 
 ---
 

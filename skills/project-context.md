@@ -34,14 +34,15 @@
 - 每个图层一个 HTML canvas + 独立 CanvasBrush 实例
 - 通过 `options.brushLayers` 配置图层数组（不传则默认单图层 `{label:'默认图层', value:'default'}`）
 - 笔刷可调：颜色、透明度（Group.opacity）、大小、连续性阈值
-- 橡皮擦工具：擦除当前图层内容
+- 橡皮擦工具：擦除当前图层内容；**橡皮擦尺寸独立配置**（`eraserSize`，未设置时与 `size` 相同）
+- 套索工具：自由绘制闭合区域，填充/擦除，与笔刷共享颜色和 undo/redo
 - `clearBrush()` / `clearAllBrushLayers()` 清空笔刷
 - 图层切换：`setActiveLayer(value)` 或 `v-model:current-layer`
 - **撤销/重做**：基于 ImageData 快照（BrushSnapshotCommand）
 
 ### 2.3 `enableBrush` 功能开关（v1.1 新增）
 - `options.enableBrush = false` 时完全禁用笔刷相关功能
-- 影响范围：工具栏笔刷/橡皮按钮、笔刷配置面板、`brushTool()`、`eraserTool()`、`updateBrushStyle()`、`clearBrush()`、`clearAllBrushLayers()`、`createBrushFromPoints()`、`exportMaskImage*()`、`getMaskBlob()`、`getMaskFile()`、`getAllMaskBlobs()`、快捷键 `b` / `e`
+- 影响范围：工具栏笔刷/橡皮/套索按钮、笔刷配置面板、`brushTool()`、`eraserTool()`、`lassoTool()`、`updateBrushStyle()`、`clearBrush()`、`clearAllBrushLayers()`、`createBrushFromPoints()`、`exportMaskImage*()`、`getMaskBlob()`、`getMaskFile()`、`getAllMaskBlobs()`、快捷键 `b` / `e` / `l`
 - 启用/禁用切换时会重建或清理笔刷图层
 - 删除确认文案根据是否启用笔刷动态变化
 
@@ -62,11 +63,11 @@
 - **Mask (多图层 Blob)**: `getAllMaskBlobs()` - 返回 `Record<layerValue, Blob>`
 
 ### 2.6 工具栏与快捷键
-- 内置工具栏包含：select、point、brush、eraser、delete、clear、undo、redo
+- 内置工具栏包含：select、point、brush、eraser、lasso、delete、clear、undo、redo
 - `showToolbar: false` / `showZoomController: false` 隐藏内置 UI，父组件自定义
 - ✨ **`enableHotkeys`（默认 false）**：`options.enableHotkeys = true` 时才启用快捷键，默认全部禁用
 - 快捷键生效条件：`enableHotkeys = true` 且画布 focus 或 hover 画布
-- 快捷键列表：`v` (select)、`p` (point)、`b` (brush, 需 enableBrush)、`e` (eraser, 需 enableBrush)、`Ctrl+Z` (undo)、`Ctrl+Y` (redo)、`Delete` (删除选中)、`Ctrl++/-` (缩放)、`Ctrl+0` (重置)、`Alt` (快捷键提示)
+- 快捷键列表：`v` (select)、`p` (point)、`b` (brush, 需 enableBrush)、`e` (eraser, 需 enableBrush)、`l` (lasso, 需 enableBrush)、`Ctrl+Z` (undo)、`Ctrl+Y` (redo)、`Delete` (删除选中)、`Ctrl++/-` (缩放)、`Ctrl+0` (重置)、`Alt` (快捷键提示)
 
 ### 2.7 图片加载
 - **单一数据源**：图片加载完全依赖 `props.imageSource`
@@ -80,8 +81,16 @@
 - `options.brushCursorEnabled`（默认 true）控制是否显示笔刷/橡皮擦的自定义跟随光标
 - 切换到 brush/eraser 工具时，光标显示为笔刷形状
 - 光标颜色、大小、透明度与当前笔刷样式实时同步
-- brush 模式下 fill = 笔刷颜色，eraser 模式下 fill = transparent / stroke = #ffffff
+- brush 模式下 fill = 笔刷颜色，eraser 模式下 fill = transparent / stroke = 白色（双层描边，黑+白确保在任意背景可见）
+- lasso 工具使用浏览器默认光标（不使用自定义笔刷光标）
 - 切换到 brush/eraser 时自动隐藏默认鼠标指针，退出时恢复
+
+### 2.9 套索工具（v1.2 新增）
+- 自由绘制闭合区域，与笔刷共享颜色、透明度、图层设置
+- 与笔刷使用同一套撤销/重做机制（ImageData 快照）
+- 高对比度轨迹：黑色 1px 主线 + 白色 3px 描边，确保在任意背景下可见
+- `options.lassoFixedSizeOnZoom`（默认 true）：套索轨迹保持固定屏幕大小，不随画布缩放变粗
+- 快捷键 `l` 切换（需 enableBrush + enableHotkeys）
 
 ---
 
@@ -114,6 +123,7 @@ interface OptionsSource {
   enableBrush?: boolean                     // ✨ 是否启用笔刷（默认 true），false 时所有笔刷功能失效
   enableHotkeys?: boolean                   // ✨ 是否启用键盘快捷键（默认 false），默认全部禁用
   brushCursorEnabled?: boolean             // ✨ 是否显示笔刷/橡皮擦的自定义跟随光标（默认 true）
+  lassoFixedSizeOnZoom?: boolean           // ✨ 套索轨迹是否保持固定屏幕大小（默认 true），不随画布缩放变粗
   loadingGradientColors?: [string, string]  // 加载中渐变动画的两个颜色（默认：淡紫 -> 淡蓝）
   loadingTextColor?: string                // 加载中文字颜色（默认：'#4a5568'）
 
@@ -182,7 +192,7 @@ import type {
   BrushStyle,               // 笔刷样式
   BrushLayerConfig,         // 图层配置
   BrushStrokeData,          // 笔画数据
-  ToolType,                 // 'select' | 'point' | 'brush' | 'eraser'
+  ToolType,                 // 'select' | 'point' | 'brush' | 'eraser' | 'lasso'
   ExportFormat,             // 导出格式
   ExportOptions,            // 导出选项
   ImportOptions,            // 导入选项
@@ -236,9 +246,9 @@ import {
 > **图片加载说明**：图片加载完全通过 `props.imageSource` 控制，不再对外暴露 `loadImage()` 和 `openFileDialog()` 方法。组件内部选择图片后通过 `v-model:imageSource` 自动同步到父组件。
 
 ### 5.3 工具切换
-- `getCurrentTool()` - `'select' | 'point' | 'brush' | 'eraser'`
-- `setTool(tool)` - 切换工具（enableBrush=false 时 brush/eraser 被拦截）
-- `selectTool()` / `pointTool()` / `brushTool(openPanel?)` / `eraserTool()`
+- `getCurrentTool()` - `'select' | 'point' | 'brush' | 'eraser' | 'lasso'`
+- `setTool(tool)` - 切换工具（enableBrush=false 时 brush/eraser/lasso 被拦截）
+- `selectTool()` / `pointTool()` / `brushTool(openPanel?)` / `eraserTool()` / `lassoTool()`
 
 ### 5.4 删除 & 清空
 - `deleteSelected()` - 删除选中点（带确认）
@@ -253,8 +263,8 @@ import {
 - `getAllLayers()` - 返回 `BrushLayerConfig[]`
 
 ### 5.6 笔刷样式
-- `getBrushStyle()` - 返回当前样式拷贝
-- `updateBrushStyle({ color?, opacity?, size?, continuity? })` - 动态修改
+- `getBrushStyle()` - 返回当前样式拷贝（含 eraserSize）
+- `updateBrushStyle({ color?, opacity?, size?, eraserSize?, continuity? })` - 动态修改
 
 ### 5.7 点轨迹生成笔刷区域
 - `createBrushFromPoints()` - 按点顺序连成多边形填充
@@ -294,6 +304,7 @@ leafer-point-annotation/
 │   │   └── PointAnnotationElement.ts  # 自定义点元素（Group + Ellipse + Text），内置状态切换、自动重排
 │   ├── utils/
 │   │   ├── CanvasBrush.ts             # ✨ 笔刷底层（canvas/ctx、绘制、fillPolygon、ImageData 快照）
+│   │   ├── LassoOverlay.ts            # ✨ 套索工具（自由绘制闭合区域、黑白双线轨迹、缩放补偿）
 │   │   ├── BrushCommands.ts           # BrushSnapshotCommand（笔刷 undo/redo 命令）
 │   │   ├── PointCommands.ts           # AddPointCommand / RemovePointCommand（点 undo/redo 命令）
 │   │   ├── BrushStroke.ts             # 笔画数据结构
@@ -390,7 +401,14 @@ git push
 - 撤销基于操作前后的 ImageData 快照
 - 透明度通过 Group.opacity 控制，避免叠加问题
 
-### 8.3 `enableBrush` 的影响范围
+### 8.3 套索工具（LassoOverlay.ts）
+- 自由绘制闭合路径，松开鼠标后调用 `CanvasBrush.fillPolygon()` 填充
+- 高对比度轨迹：双层 Path 叠加（下层白色 3px 描边 + 上层黑色 1px 主线），确保在任意背景色下都清晰可见
+- 缩放补偿：`lassoFixedSizeOnZoom=true`（默认）时，通过 `strokeWidth / scale` 保持轨迹屏幕尺寸不变
+- 与笔刷共享颜色、透明度、图层、undo/redo 机制
+- 光标：使用浏览器默认光标，不使用笔刷自定义光标
+
+### 8.4 `enableBrush` 的影响范围
 - 入口：`effectiveEnableBrush = computed(() => props.options?.enableBrush !== false)`
 - UI 层：笔刷按钮、橡皮按钮、BrushStylePanel 加 `v-if="effectiveEnableBrush"`
 - 方法层：所有笔刷相关方法开头加守卫
@@ -399,7 +417,7 @@ git push
 - 导出层：Mask/Blob/File 相关方法返回 null/{ }
 - 确认文案：deleteSelected 的提示根据是否启用笔刷动态变化
 
-### 8.4 Props 命名约定
+### 8.5 Props 命名约定
 - **组件对外 props 用 kebab-case**（Vue 模板中）：`:image-source`、`:options`、`v-model:current-layer`
 - **事件名也用 kebab-case**：`@point-change`、`@load-success`、`@layer-change`
 - **内部 TypeScript 用 camelCase**：`imageSource`、`currentLayer`、`pointStyle`
@@ -439,8 +457,14 @@ git push
 
 ### ✨ Q9. 快捷键没反应？
 - 检查 `options.enableHotkeys` 是否为 `true`（默认 false，全部禁用）
-- 检查是否启用 `enableBrush`（笔刷快捷键 `b`、`e` 需 enableBrush）
+- 检查是否启用 `enableBrush`（笔刷快捷键 `b`、`e`、`l` 需 enableBrush）
 - 快捷键生效条件：画布 focus 或 hover 画布
+
+### Q10. 套索工具和笔刷工具有什么区别？
+- 目标一致：都是在当前笔刷图层绘制/擦除区域
+- 使用方式不同：笔刷是连续涂抹，套索是先画闭合路径再填充
+- 共享配置：颜色、透明度、图层、undo/redo 完全共用
+- 套索轨迹：黑白双线高对比度，默认固定屏幕大小（`lassoFixedSizeOnZoom=true`）
 
 ---
 
