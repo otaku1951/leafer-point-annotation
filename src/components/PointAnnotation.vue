@@ -565,6 +565,7 @@ const isSpacePressed = ref(false);
 
 // 笔刷光标（跟随鼠标的预览圆圈）
 let brushCursorCircle: Ellipse | null = null;
+let brushCursorCircleInner: Ellipse | null = null;  // 橡皮擦模式下的黑色内环
 let brushCursorGroup: Group | null = null;
 let brushCursorLayer: Group | null = null;  // 独立图层，zIndex 高于 pointLayer
 
@@ -1463,6 +1464,18 @@ const createBrushCursor = () => {
   });
   brushCursorGroup.add(brushCursorCircle);
 
+  brushCursorCircleInner = new Ellipse({
+    around: 'center',
+    width: toolSize,
+    height: toolSize,
+    fill: 'transparent',
+    stroke: '#000000',
+    strokeWidth: 1,
+    pointerEvents: 'none',
+    visible: false,
+  });
+  brushCursorGroup.add(brushCursorCircleInner);
+
   updateBrushCursorStyle();
 };
 
@@ -1483,7 +1496,6 @@ const updateBrushCursorStyle = () => {
   const tool = currentTool.value;
 
   if (tool === 'brush') {
-    // 笔刷模式：实心填充圆 + 颜色控制透明度
     brushCursorCircle.set({
       width: style.size,
       height: style.size,
@@ -1493,8 +1505,10 @@ const updateBrushCursorStyle = () => {
       dashPattern: null as any,
     });
     brushCursorGroup.opacity = style.opacity;
+    if (brushCursorCircleInner) {
+      brushCursorCircleInner.visible = false;
+    }
   } else if (tool === 'eraser') {
-    // 橡皮擦模式：空心黑白双环，保证在任何背景下可见
     brushCursorCircle.set({
       width: localEraserSize.value,
       height: localEraserSize.value,
@@ -1503,15 +1517,30 @@ const updateBrushCursorStyle = () => {
       strokeWidth: 2,
       dashPattern: null as any,
     });
+    if (brushCursorCircleInner) {
+      brushCursorCircleInner.set({
+        width: localEraserSize.value,
+        height: localEraserSize.value,
+        fill: 'transparent',
+        stroke: '#000000',
+        strokeWidth: 1,
+        visible: true,
+      });
+    }
     brushCursorGroup.opacity = 1;
   }
-  // 确保 around = center 使得圆心对齐鼠标
   brushCursorCircle.around = 'center';
+  if (brushCursorCircleInner) {
+    brushCursorCircleInner.around = 'center';
+  }
 };
 
 const updateBrushCursorPos = (x: number, y: number) => {
   if (!brushCursorCircle) return;
   brushCursorCircle.set({ x, y });
+  if (brushCursorCircleInner) {
+    brushCursorCircleInner.set({ x, y });
+  }
 };
 
 // 切换工具时统一更新光标显示状态
@@ -1555,6 +1584,10 @@ const destroyBrushCursor = () => {
   if (brushCursorCircle) {
     brushCursorCircle.destroy();
     brushCursorCircle = null;
+  }
+  if (brushCursorCircleInner) {
+    brushCursorCircleInner.destroy();
+    brushCursorCircleInner = null;
   }
   if (brushCursorGroup) {
     brushCursorGroup.destroy();
