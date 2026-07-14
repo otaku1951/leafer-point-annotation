@@ -26,6 +26,7 @@ export interface OptionsSource {
   enableBrush?: boolean;
   enableHotkeys?: boolean;  // 是否启用键盘快捷键（默认 false）
   brushCursorEnabled?: boolean;  // 是否显示笔刷/橡皮擦的自定义鼠标光标（默认 true）
+  lassoFixedSizeOnZoom?: boolean;  // 套索轨迹是否保持固定大小（不随画布缩放而变粗，默认 true）
   loadingGradientColors?: [string, string];  // 加载中渐变动画的两个颜色（默认：淡紫 -> 淡蓝）
   loadingTextColor?: string;  // 加载中文字颜色（默认：#4a5568）
 }
@@ -103,7 +104,7 @@ export interface BrushStrokeData {
 }
 
 // 工具类型
-export type ToolType = 'select' | 'point' | 'brush' | 'eraser';
+export type ToolType = 'select' | 'point' | 'brush' | 'eraser' | 'lasso';
 
 // 导出格式类型
 export type ExportFormat = 'json-full' | 'json-points' | 'coco' | 'yolo' | 'image-mask';

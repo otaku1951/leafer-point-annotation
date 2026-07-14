@@ -18,10 +18,7 @@
       :style="loadingStyleVars"
     >
       <!-- 加载占位 -->
-      <div
-        v-if="loadStatus === 'loading'"
-        class="loading-overlay"
-      >
+      <div v-if="loadStatus === 'loading'" class="loading-overlay">
         <div class="gradient-animation"></div>
         <div class="loading-text">图片加载中</div>
       </div>
@@ -36,7 +33,11 @@
       />
 
       <!-- 空状态/上传区域 -->
-      <div v-if="loadStatus === 'idle'" class="upload-overlay" :class="{ 'drag-over': isDragOver }">
+      <div
+        v-if="loadStatus === 'idle'"
+        class="upload-overlay"
+        :class="{ 'drag-over': isDragOver }"
+      >
         <div class="upload-icon">
           <svg
             xmlns="http://www.w3.org/2000/svg"
@@ -178,8 +179,12 @@
             stroke-linecap="round"
             stroke-linejoin="round"
           >
-            <path d="M9.06 11.9l8.07-8.06a2.85 2.85 0 1 1 4.03 4.03l-8.06 8.08"></path>
-            <path d="M7.07 14.94c-1.66 0-3 1.35-3 3.02 0 1.33-2.5 1.52-2 2.02 1.08 1.1 2.49 2.02 4 2.02 2.2 0 4-1.8 4-4.04a3.01 3.01 0 0 0-3-3.02z"></path>
+            <path
+              d="M9.06 11.9l8.07-8.06a2.85 2.85 0 1 1 4.03 4.03l-8.06 8.08"
+            ></path>
+            <path
+              d="M7.07 14.94c-1.66 0-3 1.35-3 3.02 0 1.33-2.5 1.52-2 2.02 1.08 1.1 2.49 2.02 4 2.02 2.2 0 4-1.8 4-4.04a3.01 3.01 0 0 0-3-3.02z"
+            ></path>
           </svg>
           <span class="hotkey-hint" v-if="showHotkeys">B</span>
         </button>
@@ -200,9 +205,35 @@
             stroke-linecap="round"
             stroke-linejoin="round"
           >
-            <path d="M20 20H7L3 16C2.4 15.4 2.4 14.4 3 13.8L13.8 3C14.4 2.4 15.4 2.4 16 3L21 8C21.6 8.6 21.6 9.6 21 10.2L10.2 21C9.6 21.6 8.6 21.6 8 21L3 16"></path>
+            <path
+              d="M20 20H7L3 16C2.4 15.4 2.4 14.4 3 13.8L13.8 3C14.4 2.4 15.4 2.4 16 3L21 8C21.6 8.6 21.6 9.6 21 10.2L10.2 21C9.6 21.6 8.6 21.6 8 21L3 16"
+            ></path>
           </svg>
           <span class="hotkey-hint" v-if="showHotkeys">E</span>
+        </button>
+        <button
+          class="tool-button"
+          :class="{ active: currentTool === 'lasso' }"
+          title="套索工具 (L)"
+          @click="lassoTool"
+        >
+          <svg
+            xmlns="http://www.w3.org/2000/svg"
+            width="24"
+            height="24"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="2"
+            stroke-linecap="round"
+            stroke-linejoin="round"
+            class="lucide lucide-lasso-icon lucide-lasso"
+          >
+            <path d="M3.704 14.467a10 8 0 1 1 3.115 2.375" />
+            <path d="M7 22a5 5 0 0 1-2-3.994" />
+            <circle cx="5" cy="16" r="2" />
+          </svg>
+          <span class="hotkey-hint" v-if="showHotkeys">L</span>
         </button>
       </template>
       <button class="tool-button" title="撤销 (Ctrl+Z)" @click="undo">
@@ -259,7 +290,7 @@
       </button>
     </div>
   </div>
-  
+
   <!-- 笔刷样式配置面板（仅在 enableBrush=true 时渲染） -->
   <BrushStylePanel
     v-if="effectiveEnableBrush"
@@ -272,7 +303,15 @@
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted, onUnmounted, nextTick, computed, watch, PropType } from "vue";
+import {
+  ref,
+  onMounted,
+  onUnmounted,
+  nextTick,
+  computed,
+  watch,
+  PropType,
+} from "vue";
 import {
   App,
   ImageEvent,
@@ -286,20 +325,28 @@ import "@leafer-in/editor";
 import "@leafer-in/resize";
 import "@leafer-in/viewport";
 import "@leafer-in/view";
-import { EditorEvent } from '@leafer-in/editor'
-import { CommandManager } from '@zzalai/leafer-undo-redo'
-import { AddPointCommand, RemovePointCommand } from '@/utils/PointCommands';
-import { BrushSnapshotCommand } from '@/utils/BrushCommands';
-import { exportCOCOFormat } from '@/utils/COCOExporter';
-import { exportYOLOFormat } from '@/utils/YOLOExporter';
+import { EditorEvent } from "@leafer-in/editor";
+import { CommandManager } from "@zzalai/leafer-undo-redo";
+import { AddPointCommand, RemovePointCommand } from "@/utils/PointCommands";
+import { BrushSnapshotCommand } from "@/utils/BrushCommands";
+import { exportCOCOFormat } from "@/utils/COCOExporter";
+import { exportYOLOFormat } from "@/utils/YOLOExporter";
 
 // @ts-ignore - tinykeys 类型声明问题
 import { tinykeys } from "tinykeys";
 
 import { PointAnnotationElement } from "@/elements/PointAnnotationElement";
 import { CanvasBrush } from "@/utils/CanvasBrush";
+import { LassoOverlay } from "@/utils/LassoOverlay";
 import BrushStylePanel from "./BrushStylePanel.vue";
-import type { PointAnnotation, PointStyle, BrushStyle, BrushLayerConfig, ImageSource, OptionsSource } from "@/types";
+import type {
+  PointAnnotation,
+  PointStyle,
+  BrushStyle,
+  BrushLayerConfig,
+  ImageSource,
+  OptionsSource,
+} from "@/types";
 import { DEFAULT_POINT_STYLE, DEFAULT_BRUSH_STYLE } from "@/types";
 
 const props = defineProps({
@@ -321,7 +368,15 @@ const props = defineProps({
   // 返回 false 阻止创建；支持 Promise<boolean> 用于异步场景（如弹确认框）
   // 参数：x(像素X), y(像素Y), normalizedX(0-1), normalizedY(0-1), existingPointCount(已有点数)
   beforeCreatePoint: {
-    type: Function as PropType<(x: number, y: number, normalizedX: number, normalizedY: number, existingPointCount: number) => boolean | Promise<boolean>>,
+    type: Function as PropType<
+      (
+        x: number,
+        y: number,
+        normalizedX: number,
+        normalizedY: number,
+        existingPointCount: number,
+      ) => boolean | Promise<boolean>
+    >,
     required: false,
     default: undefined,
   },
@@ -358,7 +413,9 @@ const mousePosition = ref({ x: 0, y: 0 });
 const isCanvasFocused = ref(false);
 const isMouseOverCanvas = ref(false);
 const showHotkeys = ref(false);
-const currentTool = ref<"select" | "point" | "brush" | "eraser">("select");
+const currentTool = ref<"select" | "point" | "brush" | "eraser" | "lasso">(
+  "select",
+);
 const zoomLevel = ref<number>(100);
 
 // 笔刷配置面板相关
@@ -371,22 +428,30 @@ const pointAnnotations = ref<PointAnnotation[]>([]);
 const pointCounter = ref(1);
 
 // 是否显示工具界面
-const hasImage = computed(() => loadStatus.value === 'success');
-const showToolbar = computed(() => hasImage.value && (props.options?.showToolbar !== false));
-const showZoomController = computed(() => hasImage.value && (props.options?.showZoomController !== false));
-const effectiveEnableBrush = computed(() => props.options?.enableBrush !== false);
-const brushCursorEnabled = computed(() => props.options?.brushCursorEnabled !== false);
+const hasImage = computed(() => loadStatus.value === "success");
+const showToolbar = computed(
+  () => hasImage.value && props.options?.showToolbar !== false,
+);
+const showZoomController = computed(
+  () => hasImage.value && props.options?.showZoomController !== false,
+);
+const effectiveEnableBrush = computed(
+  () => props.options?.enableBrush !== false,
+);
+const brushCursorEnabled = computed(
+  () => props.options?.brushCursorEnabled !== false,
+);
 
 // 加载中样式变量（通过 CSS 变量注入）
 const loadingStyleVars = computed(() => {
-  const defaultColors: [string, string] = ['#e8e0ff', '#d8e8ff'];  // 淡紫 -> 淡蓝
+  const defaultColors: [string, string] = ["#e8e0ff", "#d8e8ff"]; // 淡紫 -> 淡蓝
   const colors = props.options?.loadingGradientColors || defaultColors;
-  const textColor = props.options?.loadingTextColor || '#4a5568';
-  
+  const textColor = props.options?.loadingTextColor || "#4a5568";
+
   return {
-    '--loading-gradient-start': colors[0],
-    '--loading-gradient-end': colors[1],
-    '--loading-text-color': textColor,
+    "--loading-gradient-start": colors[0],
+    "--loading-gradient-end": colors[1],
+    "--loading-text-color": textColor,
   };
 });
 
@@ -410,25 +475,29 @@ const localBrushStyle = ref<BrushStyle>({
 
 // 本地响应式橡皮擦大小（独立于笔刷大小）
 const localEraserSize = ref<number>(
-  props.options?.brushStyle?.eraserSize ?? localBrushStyle.value.size
+  props.options?.brushStyle?.eraserSize ?? localBrushStyle.value.size,
 );
 
 // 监听 prop 变化，同步到本地状态
-watch(brushStyle, (newVal: BrushStyle) => {
-  localBrushStyle.value = { ...newVal };
-  if (newVal.eraserSize !== undefined) {
-    localEraserSize.value = newVal.eraserSize;
-  }
-}, { immediate: true });
+watch(
+  brushStyle,
+  (newVal: BrushStyle) => {
+    localBrushStyle.value = { ...newVal };
+    if (newVal.eraserSize !== undefined) {
+      localEraserSize.value = newVal.eraserSize;
+    }
+  },
+  { immediate: true },
+);
 
 // 监听笔刷透明度变化，更新所有图层的 CanvasBrush 透明度
 watch(
   () => localBrushStyle.value.opacity,
   (newOpacity) => {
-    Object.values(canvasBrushesByLayer.value).forEach(brush => {
+    Object.values(canvasBrushesByLayer.value).forEach((brush) => {
       brush.setOpacity(newOpacity);
     });
-  }
+  },
 );
 
 // 监听笔刷属性变化（颜色/大小/透明度/橡皮擦大小），同步更新笔刷光标样式
@@ -442,27 +511,21 @@ watch(
   () => {
     updateBrushCursorStyle();
   },
-  { deep: true }
+  { deep: true },
 );
 
 // 监听当前工具变化，同步显示/隐藏笔刷光标
-watch(
-  currentTool,
-  () => {
-    syncBrushCursorVisibility();
-  }
-);
+watch(currentTool, () => {
+  syncBrushCursorVisibility();
+});
 
 // 监听笔刷光标开关配置变化，运行时切换也能生效
-watch(
-  brushCursorEnabled,
-  () => {
-    if (brushCursorEnabled.value && !brushCursorLayer) {
-      createBrushCursor();
-    }
-    syncBrushCursorVisibility();
+watch(brushCursorEnabled, () => {
+  if (brushCursorEnabled.value && !brushCursorLayer) {
+    createBrushCursor();
   }
-);
+  syncBrushCursorVisibility();
+});
 
 // 监听 props.imageSource 变化
 watch(
@@ -477,7 +540,7 @@ watch(
         imageBox.destroy();
         imageBox = null;
       }
-      loadStatus.value = 'idle';
+      loadStatus.value = "idle";
     }
   },
   //{ immediate: true }
@@ -485,19 +548,21 @@ watch(
 
 // 多图层相关状态
 const MAX_BRUSH_LAYERS = 8;
-const DEFAULT_LAYER_VALUE = 'default';
+const DEFAULT_LAYER_VALUE = "default";
 
 // 计算实际的图层配置
 const effectiveBrushLayers = computed<BrushLayerConfig[]>(() => {
   const configured = props.options?.brushLayers;
   if (!configured || configured.length === 0) {
-    return [{
-      label: '笔刷',
-      value: DEFAULT_LAYER_VALUE,
-      color: localBrushStyle.value.color,
-      opacity: localBrushStyle.value.opacity,
-      size: localBrushStyle.value.size,
-    }];
+    return [
+      {
+        label: "笔刷",
+        value: DEFAULT_LAYER_VALUE,
+        color: localBrushStyle.value.color,
+        opacity: localBrushStyle.value.opacity,
+        size: localBrushStyle.value.size,
+      },
+    ];
   }
   const maxLayers = props.options?.maxBrushLayers || MAX_BRUSH_LAYERS;
   return configured.slice(0, maxLayers);
@@ -507,14 +572,22 @@ const effectiveBrushLayers = computed<BrushLayerConfig[]>(() => {
 const canvasBrushesByLayer = ref<Record<string, CanvasBrush>>({});
 
 // 内部当前激活图层（非受控模式使用）
-const internalCurrentLayer = ref<string>('');
+const internalCurrentLayer = ref<string>("");
 
 // 实际当前激活图层（受控 or 非受控）
 const effectiveCurrentLayer = computed<string>(() => {
-  if (props.currentLayer && effectiveBrushLayers.value.some(l => l.value === props.currentLayer)) {
+  if (
+    props.currentLayer &&
+    effectiveBrushLayers.value.some((l) => l.value === props.currentLayer)
+  ) {
     return props.currentLayer;
   }
-  if (internalCurrentLayer.value && effectiveBrushLayers.value.some(l => l.value === internalCurrentLayer.value)) {
+  if (
+    internalCurrentLayer.value &&
+    effectiveBrushLayers.value.some(
+      (l) => l.value === internalCurrentLayer.value,
+    )
+  ) {
     return internalCurrentLayer.value;
   }
   return effectiveBrushLayers.value[0]?.value || DEFAULT_LAYER_VALUE;
@@ -533,8 +606,8 @@ watch(
   (newVal) => {
     // 关闭笔刷 → 清理画布 + 重置 tool 状态
     if (!newVal) {
-      if (currentTool.value === 'brush' || currentTool.value === 'eraser') {
-        currentTool.value = 'select';
+      if (currentTool.value === "brush" || currentTool.value === "eraser") {
+        currentTool.value = "select";
       }
       showBrushPanel.value = false;
     }
@@ -542,21 +615,26 @@ watch(
     if (newVal && imageWidth.value && imageHeight.value && app) {
       initBrushLayers();
     }
-  }
+  },
 );
 
 // 监听图层配置变化（支持运行时从单图层切到多图层，或切换图层配置）
 watch(
   () => {
     const layers = props.options?.brushLayers;
-    return layers ? layers.map(l => l.value).sort().join(',') : '';
+    return layers
+      ? layers
+          .map((l) => l.value)
+          .sort()
+          .join(",")
+      : "";
   },
   () => {
     if (!effectiveEnableBrush.value) return;
     if (imageWidth.value && imageHeight.value && app) {
       initBrushLayers();
     }
-  }
+  },
 );
 
 // 笔刷相关状态
@@ -565,9 +643,9 @@ const isSpacePressed = ref(false);
 
 // 笔刷光标（跟随鼠标的预览圆圈）
 let brushCursorCircle: Ellipse | null = null;
-let brushCursorCircleInner: Ellipse | null = null;  // 橡皮擦模式下的黑色内环
+let brushCursorCircleInner: Ellipse | null = null; // 橡皮擦模式下的黑色内环
 let brushCursorGroup: Group | null = null;
-let brushCursorLayer: Group | null = null;  // 独立图层，zIndex 高于 pointLayer
+let brushCursorLayer: Group | null = null; // 独立图层，zIndex 高于 pointLayer
 
 // 撤销/重做管理器
 let commandManager: CommandManager | null = null;
@@ -575,19 +653,27 @@ let commandManager: CommandManager | null = null;
 // 🔧 多实例支持：tinykeys 解绑函数（保存在组件作用域，避免多个实例互相覆盖 window.__pointAnnotationHotkeysUnsubscribe）
 let hotkeysUnsubscribe: (() => void) | null = null;
 
+// 套索工具
+let lassoOverlay: LassoOverlay | null = null;
+const isLassoDrawing = ref(false);
+
 // 根据配置强制【标注点】不跟随画布Scale变化
 const changePointScaleRelativeCanvas = (pointAnnotationLayer: Group | null) => {
   // 检查是否开启固定大小功能
   if (!pointStyle.value.fixedSizeOnZoom) return;
-  
-  if (pointAnnotationLayer && pointAnnotationLayer.children && pointAnnotationLayer.children.length) {
+
+  if (
+    pointAnnotationLayer &&
+    pointAnnotationLayer.children &&
+    pointAnnotationLayer.children.length
+  ) {
     const _scaleX = app?.tree.scaleX || 1;
     const scaleFactor = pointStyle.value.fixedSizeScale || 1;
-    pointAnnotationLayer.children.forEach(element => {
+    pointAnnotationLayer.children.forEach((element) => {
       element.scale = scaleFactor / _scaleX;
     });
   }
-}
+};
 
 const initCanvas = () => {
   const canvasBackground = props.options?.canvasBackground ?? "#e3e3e3";
@@ -633,7 +719,13 @@ const initCanvas = () => {
 
     // 笔刷光标跟随鼠标
     app.on(PointerEvent.MOVE, (e: any) => {
-      if (!brushCursorCircle || !brushCursorGroup || !brushCursorGroup.visible || !app) return;
+      if (
+        !brushCursorCircle ||
+        !brushCursorGroup ||
+        !brushCursorGroup.visible ||
+        !app
+      )
+        return;
       // 关键修复：e.x/e.y 是 app 根级坐标（屏幕坐标）
       // brushCursorCircle 在 app.tree 子层内部，需要转换到 app.tree 本地坐标
       const treeScale = (app.tree as any).scale ?? 1;
@@ -665,8 +757,8 @@ const preloadImageSize = (
 };
 
 const loadImage = async (imageSrc?: string | undefined) => {
-  const _imageSrc = imageSrc || props.imageSource?.url || '';
-  
+  const _imageSrc = imageSrc || props.imageSource?.url || "";
+
   if (!app || !_imageSrc) {
     loadStatus.value = "idle";
     return;
@@ -710,14 +802,14 @@ const loadImage = async (imageSrc?: string | undefined) => {
     imageBox.on(ImageEvent.LOADED, function () {
       loadStatus.value = "success";
       emit("loadSuccess", {
-        url: props.imageSource?.url || '',
+        url: props.imageSource?.url || "",
         width: imageWidth.value,
         height: imageHeight.value,
-        id: props.imageSource?.id || '',
+        id: props.imageSource?.id || "",
         isLocal: props.imageSource?.isLocal || false,
         file: props.imageSource?.file || undefined,
       });
-      const currentUrl = props.imageSource?.url || '';
+      const currentUrl = props.imageSource?.url || "";
       if (blobUrls.has(currentUrl)) {
         URL.revokeObjectURL(currentUrl);
         blobUrls.delete(currentUrl);
@@ -742,8 +834,8 @@ const loadImage = async (imageSrc?: string | undefined) => {
 
 const getImageInfo = () => {
   return {
-    id: props.imageSource?.id || '',
-    url: props.imageSource?.url || '',
+    id: props.imageSource?.id || "",
+    url: props.imageSource?.url || "",
     width: imageWidth.value,
     height: imageHeight.value,
     isLocal: props.imageSource?.isLocal || false,
@@ -754,11 +846,11 @@ const getImageInfo = () => {
 const handleFileUpload = (event: Event) => {
   const target = event.target as HTMLInputElement;
   const file = target.files?.[0];
-  if (file && file.type.startsWith('image/')) {
+  if (file && file.type.startsWith("image/")) {
     const url = URL.createObjectURL(file);
     blobUrls.add(url);
-    emit('update:imageSource', {
-      id: 'local-image-' + Date.now(),
+    emit("update:imageSource", {
+      id: "local-image-" + Date.now(),
       url: url,
       width: 0,
       height: 0,
@@ -766,7 +858,7 @@ const handleFileUpload = (event: Event) => {
       file: file,
     });
   }
-  target.value = '';
+  target.value = "";
 };
 
 const openFileDialog = () => {
@@ -789,15 +881,15 @@ const handleDrop = (event: DragEvent) => {
   event.preventDefault();
   event.stopPropagation();
   isDragOver.value = false;
-  
+
   const files = event.dataTransfer?.files;
   if (files && files.length > 0) {
     const file = files[0];
-    if (file.type.startsWith('image/')) {
+    if (file.type.startsWith("image/")) {
       const url = URL.createObjectURL(file);
       blobUrls.add(url);
-      emit('update:imageSource', {
-        id: 'local-image-' + Date.now(),
+      emit("update:imageSource", {
+        id: "local-image-" + Date.now(),
         url: url,
         width: 0,
         height: 0,
@@ -818,8 +910,8 @@ const exportCanvasJSON = (): string => {
   });
 
   const exportData = {
-    version: '1.0',
-    imageUrl: props.imageSource?.url || '',
+    version: "1.0",
+    imageUrl: props.imageSource?.url || "",
     imageWidth: imageWidth.value,
     imageHeight: imageHeight.value,
     pointAnnotations: [...pointAnnotations.value],
@@ -833,13 +925,14 @@ const exportCanvasJSON = (): string => {
 // 内部辅助：把笔刷图层渲染为 HTMLCanvas + mime（二值图）
 const buildMaskCanvas = (
   brush: any,
-  format?: 'png' | 'jpeg' | 'jpg',
-  foregroundColor?: 'black' | 'white'
+  format?: "png" | "jpeg" | "jpg",
+  foregroundColor?: "black" | "white",
 ): Promise<{ canvas: HTMLCanvasElement; mime: string } | null> => {
   return new Promise((resolve) => {
-    const exportFormat = format || props.options?.maskExportFormat || 'png';
-    const fgColor = foregroundColor || props.options?.maskExportForeground || 'black';
-    const mime = exportFormat === 'png' ? 'image/png' : 'image/jpeg';
+    const exportFormat = format || props.options?.maskExportFormat || "png";
+    const fgColor =
+      foregroundColor || props.options?.maskExportForeground || "black";
+    const mime = exportFormat === "png" ? "image/png" : "image/jpeg";
 
     const dataCanvas = brush.getDataCanvas?.();
     if (!dataCanvas) {
@@ -847,30 +940,30 @@ const buildMaskCanvas = (
       return;
     }
 
-    const canvas = document.createElement('canvas');
+    const canvas = document.createElement("canvas");
     canvas.width = imageWidth.value || 0;
     canvas.height = imageHeight.value || 0;
-    const ctx = canvas.getContext('2d', { willReadFrequently: true });
+    const ctx = canvas.getContext("2d", { willReadFrequently: true });
     if (!ctx) {
       resolve(null);
       return;
     }
 
-    const isWhite = fgColor === 'white';
-    const backgroundColor = isWhite ? 'black' : 'white';
-    const contentColor = isWhite ? 'white' : 'black';
+    const isWhite = fgColor === "white";
+    const backgroundColor = isWhite ? "black" : "white";
+    const contentColor = isWhite ? "white" : "black";
 
     ctx.drawImage(dataCanvas.context.canvas, 0, 0);
 
-    ctx.globalCompositeOperation = 'source-in';
+    ctx.globalCompositeOperation = "source-in";
     ctx.fillStyle = contentColor;
     ctx.fillRect(0, 0, canvas.width, canvas.height);
-    ctx.globalCompositeOperation = 'source-over';
+    ctx.globalCompositeOperation = "source-over";
 
-    ctx.globalCompositeOperation = 'destination-over';
+    ctx.globalCompositeOperation = "destination-over";
     ctx.fillStyle = backgroundColor;
     ctx.fillRect(0, 0, canvas.width, canvas.height);
-    ctx.globalCompositeOperation = 'source-over';
+    ctx.globalCompositeOperation = "source-over";
 
     resolve({ canvas, mime });
   });
@@ -879,41 +972,48 @@ const buildMaskCanvas = (
 // 辅助函数：导出单个图层的 mask（返回 dataURL）
 const exportSingleLayerMask = async (
   brush: any,
-  format?: 'png' | 'jpeg' | 'jpg',
-  foregroundColor?: 'black' | 'white'
+  format?: "png" | "jpeg" | "jpg",
+  foregroundColor?: "black" | "white",
 ): Promise<string | null> => {
   const result = await buildMaskCanvas(brush, format, foregroundColor);
   if (!result) return null;
   const { canvas, mime } = result;
-  return mime === 'image/png'
-    ? canvas.toDataURL('image/png')
-    : canvas.toDataURL('image/jpeg', 0.95);
+  return mime === "image/png"
+    ? canvas.toDataURL("image/png")
+    : canvas.toDataURL("image/jpeg", 0.95);
 };
 
 // 导出二值图（Mask）- 当前激活图层（笔刷禁用时返回 null）
-const exportMaskImage = (format?: 'png' | 'jpeg' | 'jpg', foregroundColor?: 'black' | 'white'): Promise<string | null> => {
+const exportMaskImage = (
+  format?: "png" | "jpeg" | "jpg",
+  foregroundColor?: "black" | "white",
+): Promise<string | null> => {
   if (!effectiveEnableBrush.value) return Promise.resolve(null);
   if (!activeCanvasBrush.value) return Promise.resolve(null);
-  
+
   // ✅ 真实判断：检查 brush 是否有实际内容
   if (!activeCanvasBrush.value.hasContent?.()) {
-    console.log('[exportMaskImage] 当前图层没有笔刷内容');
+    console.log("[exportMaskImage] 当前图层没有笔刷内容");
     return Promise.resolve(null);
   }
-  
-  return exportSingleLayerMask(activeCanvasBrush.value, format, foregroundColor);
+
+  return exportSingleLayerMask(
+    activeCanvasBrush.value,
+    format,
+    foregroundColor,
+  );
 };
 
 // 导出指定图层的 mask（笔刷禁用时返回 null）
 const exportMaskImageByLayer = (
   layerValue: string,
-  format?: 'png' | 'jpeg' | 'jpg',
-  foregroundColor?: 'black' | 'white'
+  format?: "png" | "jpeg" | "jpg",
+  foregroundColor?: "black" | "white",
 ): Promise<string | null> => {
   if (!effectiveEnableBrush.value) return Promise.resolve(null);
   const brush = canvasBrushesByLayer.value[layerValue];
   if (!brush) return Promise.resolve(null);
-  
+
   // ✅ 真实判断：检查 brush 是否有实际内容
   if (!brush.hasContent?.()) {
     console.log(`[exportMaskImageByLayer] 图层 ${layerValue} 没有笔刷内容`);
@@ -924,16 +1024,20 @@ const exportMaskImageByLayer = (
 
 // 导出所有图层的 masks（笔刷禁用时返回空对象）
 const exportAllMaskImages = (
-  format?: 'png' | 'jpeg' | 'jpg',
-  foregroundColor?: 'black' | 'white'
+  format?: "png" | "jpeg" | "jpg",
+  foregroundColor?: "black" | "white",
 ): Promise<Record<string, string>> => {
   if (!effectiveEnableBrush.value) return Promise.resolve({});
   return new Promise(async (resolve) => {
     const result: Record<string, string> = {};
-    for (const [layerValue, brush] of Object.entries(canvasBrushesByLayer.value)) {
+    for (const [layerValue, brush] of Object.entries(
+      canvasBrushesByLayer.value,
+    )) {
       // ✅ 真实判断：检查 brush 是否有实际内容
       if (!brush.hasContent?.()) {
-        console.log(`[exportAllMaskImages] 图层 ${layerValue} 没有笔刷内容，跳过`);
+        console.log(
+          `[exportAllMaskImages] 图层 ${layerValue} 没有笔刷内容，跳过`,
+        );
         continue;
       }
       const mask = await exportSingleLayerMask(brush, format, foregroundColor);
@@ -946,12 +1050,19 @@ const exportAllMaskImages = (
 };
 
 // canvas.toBlob 的 Promise 版本（避免回调地狱）
-const canvasToBlob = (canvas: HTMLCanvasElement, mime: string): Promise<Blob | null> => {
+const canvasToBlob = (
+  canvas: HTMLCanvasElement,
+  mime: string,
+): Promise<Blob | null> => {
   return new Promise((resolve) => {
     try {
-      canvas.toBlob((blob) => {
-        resolve(blob);
-      }, mime, mime === 'image/jpeg' ? 0.95 : undefined);
+      canvas.toBlob(
+        (blob) => {
+          resolve(blob);
+        },
+        mime,
+        mime === "image/jpeg" ? 0.95 : undefined,
+      );
     } catch (_e) {
       resolve(null);
     }
@@ -963,21 +1074,21 @@ const canvasToBlob = (canvas: HTMLCanvasElement, mime: string): Promise<Blob | n
 // - 笔刷禁用时返回 null
 const getMaskBlob = (
   layerValue?: string,
-  format?: 'png' | 'jpeg' | 'jpg',
-  foregroundColor?: 'black' | 'white'
+  format?: "png" | "jpeg" | "jpg",
+  foregroundColor?: "black" | "white",
 ): Promise<Blob | null> => {
   if (!effectiveEnableBrush.value) return Promise.resolve(null);
   const brush = layerValue
     ? canvasBrushesByLayer.value[layerValue]
     : activeCanvasBrush.value;
   if (!brush) return Promise.resolve(null);
-  
+
   // ✅ 真实判断：检查 brush 是否有实际内容
   if (!brush.hasContent?.()) {
-    console.log(`[getMaskBlob] 图层 ${layerValue || '当前'} 没有笔刷内容`);
+    console.log(`[getMaskBlob] 图层 ${layerValue || "当前"} 没有笔刷内容`);
     return Promise.resolve(null);
   }
-  
+
   return new Promise(async (resolve) => {
     const result = await buildMaskCanvas(brush, format, foregroundColor);
     if (!result) return resolve(null);
@@ -991,16 +1102,18 @@ const getMaskBlob = (
 const getMaskFile = (
   layerValue?: string,
   filename?: string,
-  format?: 'png' | 'jpeg' | 'jpg',
-  foregroundColor?: 'black' | 'white'
+  format?: "png" | "jpeg" | "jpg",
+  foregroundColor?: "black" | "white",
 ): Promise<File | null> => {
   if (!effectiveEnableBrush.value) return Promise.resolve(null);
   return new Promise(async (resolve) => {
     const blob = await getMaskBlob(layerValue, format, foregroundColor);
     if (!blob) return resolve(null);
-    const mime = format === 'jpeg' || format === 'jpg' ? 'image/jpeg' : 'image/png';
-    const ext = format === 'jpeg' || format === 'jpg' ? 'jpg' : 'png';
-    const finalName = filename || `mask_${layerValue || 'current'}_${Date.now()}.${ext}`;
+    const mime =
+      format === "jpeg" || format === "jpg" ? "image/jpeg" : "image/png";
+    const ext = format === "jpeg" || format === "jpg" ? "jpg" : "png";
+    const finalName =
+      filename || `mask_${layerValue || "current"}_${Date.now()}.${ext}`;
     try {
       resolve(new File([blob], finalName, { type: mime }));
     } catch (_e) {
@@ -1017,54 +1130,60 @@ const getMaskFile = (
 // - 笔刷禁用时返回 null
 const getMaskUIBlob = (layerValue?: string): Promise<Blob | null> => {
   if (!effectiveEnableBrush.value) return Promise.resolve(null);
-  
-  const brush = layerValue 
-    ? canvasBrushesByLayer.value[layerValue] 
+
+  const brush = layerValue
+    ? canvasBrushesByLayer.value[layerValue]
     : activeCanvasBrush.value;
-  
+
   if (!brush) return Promise.resolve(null);
-  
+
   const dataCanvas = brush.getDataCanvas().context.canvas;
   const groupOpacity = (brush.getGroup() as any).opacity ?? 1;
   const color = brush.getCurrentColor();
-  
-  const canvas = document.createElement('canvas');
+
+  const canvas = document.createElement("canvas");
   canvas.width = imageWidth.value || 0;
   canvas.height = imageHeight.value || 0;
-  const ctx = canvas.getContext('2d');
+  const ctx = canvas.getContext("2d");
   if (!ctx) return Promise.resolve(null);
-  
+
   ctx.drawImage(dataCanvas, 0, 0);
-  
+
   ctx.globalAlpha = groupOpacity;
-  ctx.globalCompositeOperation = 'source-in';
+  ctx.globalCompositeOperation = "source-in";
   ctx.fillStyle = color;
   ctx.fillRect(0, 0, canvas.width, canvas.height);
-  ctx.globalCompositeOperation = 'source-over';
+  ctx.globalCompositeOperation = "source-over";
   ctx.globalAlpha = 1;
-  
+
   return new Promise((resolve) => {
     canvas.toBlob((blob) => {
       resolve(blob || null);
-    }, 'image/png');
+    }, "image/png");
   });
 };
 
 // 获取所有图层的 mask Blob（笔刷禁用时返回空对象）
 const getAllMaskBlobs = (
-  format?: 'png' | 'jpeg' | 'jpg',
-  foregroundColor?: 'black' | 'white'
+  format?: "png" | "jpeg" | "jpg",
+  foregroundColor?: "black" | "white",
 ): Promise<Record<string, Blob>> => {
   if (!effectiveEnableBrush.value) return Promise.resolve({});
   return new Promise(async (resolve) => {
     const result: Record<string, Blob> = {};
-    for (const [layerValue, brush] of Object.entries(canvasBrushesByLayer.value)) {
+    for (const [layerValue, brush] of Object.entries(
+      canvasBrushesByLayer.value,
+    )) {
       // ✅ 真实判断：检查 brush 是否有实际内容
       if (!brush.hasContent?.()) {
         console.log(`[getAllMaskBlobs] 图层 ${layerValue} 没有笔刷内容，跳过`);
         continue;
       }
-      const canvasResult = await buildMaskCanvas(brush, format, foregroundColor);
+      const canvasResult = await buildMaskCanvas(
+        brush,
+        format,
+        foregroundColor,
+      );
       if (!canvasResult) continue;
       const blob = await canvasToBlob(canvasResult.canvas, canvasResult.mime);
       if (blob) result[layerValue] = blob;
@@ -1076,9 +1195,9 @@ const getAllMaskBlobs = (
 const exportCOCO = (): string => {
   const coco = exportCOCOFormat(
     pointAnnotations.value,
-    props.imageSource?.url || '',
+    props.imageSource?.url || "",
     imageWidth.value || 0,
-    imageHeight.value || 0
+    imageHeight.value || 0,
   );
   return JSON.stringify(coco, null, 2);
 };
@@ -1087,7 +1206,7 @@ const exportYOLO = (): { annotations: string; classNames: string } => {
   const yolo = exportYOLOFormat(
     pointAnnotations.value,
     imageWidth.value || 0,
-    imageHeight.value || 0
+    imageHeight.value || 0,
   );
   return {
     annotations: yolo.annotations,
@@ -1117,7 +1236,7 @@ const importCanvasJSON = async (
     pointAnnotations.value = [];
 
     // 清除所有图层的笔刷
-    Object.values(canvasBrushesByLayer.value).forEach(brush => brush.clear());
+    Object.values(canvasBrushesByLayer.value).forEach((brush) => brush.clear());
 
     if (data.imageUrl && data.imageUrl !== props.imageSource.url) {
       await loadImage(data.imageUrl);
@@ -1125,11 +1244,18 @@ const importCanvasJSON = async (
 
     if (data.pointAnnotations && Array.isArray(data.pointAnnotations)) {
       for (const pointData of data.pointAnnotations) {
-        const pointElement = new PointAnnotationElement(pointData, pointStyle.value, () => {
-          emit("pointChange", [...pointAnnotations.value]);
-        });
-        pointElement.setImageSize(imageWidth.value || 1, imageHeight.value || 1);
-        if (currentTool.value === 'brush' || currentTool.value === 'eraser') {
+        const pointElement = new PointAnnotationElement(
+          pointData,
+          pointStyle.value,
+          () => {
+            emit("pointChange", [...pointAnnotations.value]);
+          },
+        );
+        pointElement.setImageSize(
+          imageWidth.value || 1,
+          imageHeight.value || 1,
+        );
+        if (currentTool.value === "brush" || currentTool.value === "eraser") {
           pointElement.label.editable = false;
         }
         pointLayer.add(pointElement);
@@ -1138,7 +1264,7 @@ const importCanvasJSON = async (
     }
 
     // 优先恢复多图层笔刷遮罩
-    if (data.brushLayers && typeof data.brushLayers === 'object') {
+    if (data.brushLayers && typeof data.brushLayers === "object") {
       Object.entries(data.brushLayers).forEach(([layerValue, maskData]) => {
         const brush = canvasBrushesByLayer.value[layerValue];
         if (brush && maskData) {
@@ -1157,94 +1283,100 @@ const importCanvasJSON = async (
 
     return true;
   } catch (error) {
-    console.error('Failed to import canvas JSON:', error);
+    console.error("Failed to import canvas JSON:", error);
     return false;
   }
 };
 
 onMounted(() => {
-    initCanvas();
-    loadImage();
+  initCanvas();
+  loadImage();
 
-    // 初始化撤销/重做管理器
-    commandManager = new CommandManager(100);
+  // 初始化撤销/重做管理器
+  commandManager = new CommandManager(100);
 
-    window.addEventListener("keydown", handleKeyDown);
-    window.addEventListener("keyup", handleKeyUp);
-    window.addEventListener("mousemove", handleMouseMove);
-    window.addEventListener("focusout", handleFocusOut);
+  window.addEventListener("keydown", handleKeyDown);
+  window.addEventListener("keyup", handleKeyUp);
+  window.addEventListener("mousemove", handleMouseMove);
+  window.addEventListener("focusout", handleFocusOut);
 
-    // 根据 enableHotkeys 配置决定是否注册热键（默认不启用，显式传 true 才启用）
-    if (props.options.enableHotkeys) {
-      const unsubscribe = tinykeys(window, {
-        v: (event: KeyboardEvent) => {
-          if (!isCanvasFocused.value && !isMouseOverCanvas.value) return;
-          event.preventDefault();
-          selectTool();
-        },
-        p: (event: KeyboardEvent) => {
-          if (!isCanvasFocused.value && !isMouseOverCanvas.value) return;
-          event.preventDefault();
-          pointTool();
-        },
-        b: (event: KeyboardEvent) => {
-          if (!effectiveEnableBrush.value) return;
-          if (!isCanvasFocused.value && !isMouseOverCanvas.value) return;
-          event.preventDefault();
-          brushTool();
-        },
-        e: (event: KeyboardEvent) => {
-          if (!effectiveEnableBrush.value) return;
-          if (!isCanvasFocused.value && !isMouseOverCanvas.value) return;
-          event.preventDefault();
-          eraserTool();
-        },
-        "$mod+KeyZ": (event: KeyboardEvent) => {
-          if (!isCanvasFocused.value && !isMouseOverCanvas.value) return;
-          event.preventDefault();
-          event.stopPropagation();
-          undo();
-        },
-        "$mod+KeyY": (event: KeyboardEvent) => {
-          if (!isCanvasFocused.value && !isMouseOverCanvas.value) return;
-          event.preventDefault();
-          event.stopPropagation();
-          redo();
-        },
-        Delete: (event: KeyboardEvent) => {
-          if (!isCanvasFocused.value && !isMouseOverCanvas.value) return;
-          event.preventDefault();
-          event.stopPropagation();
-          deleteSelected();
-        },
-        "$mod+Equal": (event: KeyboardEvent) => {
-          if (!isCanvasFocused.value && !isMouseOverCanvas.value) return;
-          event.preventDefault();
-          event.stopPropagation();
-          zoomIn();
-        },
-        "$mod+Minus": (event: KeyboardEvent) => {
-          if (!isCanvasFocused.value && !isMouseOverCanvas.value) return;
-          event.preventDefault();
-          event.stopPropagation();
-          zoomOut();
-        },
-        "$mod+0": (event: KeyboardEvent) => {
-          if (!isCanvasFocused.value && !isMouseOverCanvas.value) return;
-          event.preventDefault();
-          event.stopPropagation();
-          resetZoom();
-        },
-        Alt: (event: KeyboardEvent) => {
-          if (!isCanvasFocused.value && !isMouseOverCanvas.value) return;
-          event.preventDefault();
-          showHotkeys.value = !showHotkeys.value;
-        },
-      });
+  // 根据 enableHotkeys 配置决定是否注册热键（默认不启用，显式传 true 才启用）
+  if (props.options.enableHotkeys) {
+    const unsubscribe = tinykeys(window, {
+      v: (event: KeyboardEvent) => {
+        if (!isCanvasFocused.value && !isMouseOverCanvas.value) return;
+        event.preventDefault();
+        selectTool();
+      },
+      p: (event: KeyboardEvent) => {
+        if (!isCanvasFocused.value && !isMouseOverCanvas.value) return;
+        event.preventDefault();
+        pointTool();
+      },
+      b: (event: KeyboardEvent) => {
+        if (!effectiveEnableBrush.value) return;
+        if (!isCanvasFocused.value && !isMouseOverCanvas.value) return;
+        event.preventDefault();
+        brushTool();
+      },
+      e: (event: KeyboardEvent) => {
+        if (!effectiveEnableBrush.value) return;
+        if (!isCanvasFocused.value && !isMouseOverCanvas.value) return;
+        event.preventDefault();
+        eraserTool();
+      },
+      l: (event: KeyboardEvent) => {
+        if (!effectiveEnableBrush.value) return;
+        if (!isCanvasFocused.value && !isMouseOverCanvas.value) return;
+        event.preventDefault();
+        lassoTool();
+      },
+      "$mod+KeyZ": (event: KeyboardEvent) => {
+        if (!isCanvasFocused.value && !isMouseOverCanvas.value) return;
+        event.preventDefault();
+        event.stopPropagation();
+        undo();
+      },
+      "$mod+KeyY": (event: KeyboardEvent) => {
+        if (!isCanvasFocused.value && !isMouseOverCanvas.value) return;
+        event.preventDefault();
+        event.stopPropagation();
+        redo();
+      },
+      Delete: (event: KeyboardEvent) => {
+        if (!isCanvasFocused.value && !isMouseOverCanvas.value) return;
+        event.preventDefault();
+        event.stopPropagation();
+        deleteSelected();
+      },
+      "$mod+Equal": (event: KeyboardEvent) => {
+        if (!isCanvasFocused.value && !isMouseOverCanvas.value) return;
+        event.preventDefault();
+        event.stopPropagation();
+        zoomIn();
+      },
+      "$mod+Minus": (event: KeyboardEvent) => {
+        if (!isCanvasFocused.value && !isMouseOverCanvas.value) return;
+        event.preventDefault();
+        event.stopPropagation();
+        zoomOut();
+      },
+      "$mod+0": (event: KeyboardEvent) => {
+        if (!isCanvasFocused.value && !isMouseOverCanvas.value) return;
+        event.preventDefault();
+        event.stopPropagation();
+        resetZoom();
+      },
+      Alt: (event: KeyboardEvent) => {
+        if (!isCanvasFocused.value && !isMouseOverCanvas.value) return;
+        event.preventDefault();
+        showHotkeys.value = !showHotkeys.value;
+      },
+    });
 
-      // 🔧 多实例支持：unsubscribe 保存在当前组件作用域，不再使用全局 window 存储
-      hotkeysUnsubscribe = unsubscribe;
-    }
+    // 🔧 多实例支持：unsubscribe 保存在当前组件作用域，不再使用全局 window 存储
+    hotkeysUnsubscribe = unsubscribe;
+  }
 });
 
 const handleMouseMove = (e: MouseEvent) => {
@@ -1267,7 +1399,8 @@ const fitImageToCanvas = () => {
   const scale = Math.min(scaleX, scaleY, 1);
 
   const centerX = (canvasWidth - imageWidthVal * Number(scale.toFixed(2))) / 2;
-  const centerY = (canvasHeight - imageHeightVal * Number(scale.toFixed(2))) / 2;
+  const centerY =
+    (canvasHeight - imageHeightVal * Number(scale.toFixed(2))) / 2;
 
   app.tree.scale = Number(scale.toFixed(2));
   app.tree.x = centerX;
@@ -1306,11 +1439,14 @@ const handleKeyUp = (e: KeyboardEvent) => {
 
 const handleFocusOut = (e: FocusEvent) => {
   const target = e.target;
-  if (target instanceof HTMLElement && target.classList[0] === 'leafer-text-editor') {
-      // 关键：手动触发 DOM 原生的 blur
-      // 这会强制让浏览器完成失焦流程，触发插件的销毁逻辑
-      app?.editor.cancel()
-      // console.log('已强制执行 blur');
+  if (
+    target instanceof HTMLElement &&
+    target.classList[0] === "leafer-text-editor"
+  ) {
+    // 关键：手动触发 DOM 原生的 blur
+    // 这会强制让浏览器完成失焦流程，触发插件的销毁逻辑
+    app?.editor.cancel();
+    // console.log('已强制执行 blur');
   }
 };
 
@@ -1318,14 +1454,13 @@ const updateLabelEditable = (editable: boolean) => {
   // 遍历所有点标注元素，更新标签的可编辑状态
   if (pointLayer && pointLayer.children) {
     pointLayer.children.forEach((element: any) => {
-      if (element._element_tag === 'point-annotation' && element.label) {
+      if (element._element_tag === "point-annotation" && element.label) {
         element.label.editable = editable;
         // if(!editable) app?.editor.cancel()
       }
     });
   }
 };
-
 
 onUnmounted(() => {
   if (imageBox) {
@@ -1336,13 +1471,17 @@ onUnmounted(() => {
   // 销毁笔刷光标
   destroyBrushCursor();
 
+  // 销毁套索
+  lassoOverlay?.destroy();
+  lassoOverlay = null;
+
   app?.destroy();
   app = null;
 
   window.removeEventListener("keydown", handleKeyDown);
   window.removeEventListener("keyup", handleKeyUp);
   window.removeEventListener("mousemove", handleMouseMove);
-  window.removeEventListener('focusout', handleFocusOut);
+  window.removeEventListener("focusout", handleFocusOut);
 
   // 🔧 多实例支持：调用当前实例自己的 unsubscribe，不再使用全局 window
   if (hotkeysUnsubscribe) {
@@ -1361,22 +1500,26 @@ onUnmounted(() => {
 const selectTool = () => {
   currentTool.value = "select";
   showBrushPanel.value = false;
-  if (!app) return 
-  app.editor.config.moveable = false
-  app.editor.config.resizeable = false
-  app.editor.config.multipleSelect = true
-  Object.values(canvasBrushesByLayer.value).forEach(brush => brush.setPointerEvents(false));
+  if (!app) return;
+  app.editor.config.moveable = false;
+  app.editor.config.resizeable = false;
+  app.editor.config.multipleSelect = true;
+  Object.values(canvasBrushesByLayer.value).forEach((brush) =>
+    brush.setPointerEvents(false),
+  );
   updateLabelEditable(false);
 };
 
 const pointTool = () => {
   currentTool.value = "point";
   showBrushPanel.value = false;
-  if (!app) return 
-  app.editor.config.moveable = true
-  app.editor.config.multipleSelect = false
-  app.editor.config.boxSelect = false
-  Object.values(canvasBrushesByLayer.value).forEach(brush => brush.setPointerEvents(false));
+  if (!app) return;
+  app.editor.config.moveable = true;
+  app.editor.config.multipleSelect = false;
+  app.editor.config.boxSelect = false;
+  Object.values(canvasBrushesByLayer.value).forEach((brush) =>
+    brush.setPointerEvents(false),
+  );
   updateLabelEditable(false);
 };
 
@@ -1428,50 +1571,71 @@ const eraserTool = () => {
   updateLabelEditable(false);
 };
 
+const lassoTool = () => {
+  if (!effectiveEnableBrush.value) return;
+  currentTool.value = "lasso";
+  showBrushPanel.value = false;
+  if (!app) return;
+  app.editor.config.moveable = false;
+  app.editor.config.resizeable = false;
+  app.editor.config.multipleSelect = false;
+  Object.entries(canvasBrushesByLayer.value).forEach(([layerValue, brush]) => {
+    brush.setPointerEvents(layerValue === effectiveCurrentLayer.value);
+  });
+  updateLabelEditable(false);
+  if (!lassoOverlay) {
+    lassoOverlay = new LassoOverlay();
+    lassoOverlay.init(app);
+    const lassoFixedSize = props.options?.lassoFixedSizeOnZoom ?? true;
+    lassoOverlay.setFixedSizeOnZoom(lassoFixedSize);
+  }
+};
+
 // ====== 笔刷光标（跟随鼠标的预览圆圈） ======
 
 const createBrushCursor = () => {
   if (!app) return;
-  if (brushCursorLayer) return;  // 已创建，避免重复
-  if (!brushCursorEnabled.value) return;  // 用户配置关闭了笔刷光标，不创建
+  if (brushCursorLayer) return; // 已创建，避免重复
+  if (!brushCursorEnabled.value) return; // 用户配置关闭了笔刷光标，不创建
 
   // 独立图层，zIndex 高于 pointLayer，放在最上层
   brushCursorLayer = new Group({
-    name: 'brushCursorLayer',
-    pointerEvents: 'none',
+    name: "brushCursorLayer",
+    pointerEvents: "none",
   });
   app.tree.add(brushCursorLayer);
   brushCursorLayer.zIndex = 20000;
 
   // 外层 Group 用于控制透明度
   brushCursorGroup = new Group({
-    pointerEvents: 'none',
+    pointerEvents: "none",
     visible: false,
   });
   brushCursorLayer.add(brushCursorGroup);
 
   // 核心圆圈
   const style = localBrushStyle.value;
-  const toolSize = currentTool.value === 'eraser' ? localEraserSize.value : style.size;
+  const toolSize =
+    currentTool.value === "eraser" ? localEraserSize.value : style.size;
   brushCursorCircle = new Ellipse({
-    around: 'center',
+    around: "center",
     width: toolSize,
     height: toolSize,
     fill: style.color,
     stroke: style.color,
     strokeWidth: 1,
-    pointerEvents: 'none',
+    pointerEvents: "none",
   });
   brushCursorGroup.add(brushCursorCircle);
 
   brushCursorCircleInner = new Ellipse({
-    around: 'center',
+    around: "center",
     width: toolSize,
     height: toolSize,
-    fill: 'transparent',
-    stroke: '#000000',
+    fill: "transparent",
+    stroke: "#000000",
     strokeWidth: 1,
-    pointerEvents: 'none',
+    pointerEvents: "none",
     visible: false,
   });
   brushCursorGroup.add(brushCursorCircleInner);
@@ -1495,7 +1659,7 @@ const updateBrushCursorStyle = () => {
   const style = localBrushStyle.value;
   const tool = currentTool.value;
 
-  if (tool === 'brush') {
+  if (tool === "brush") {
     brushCursorCircle.set({
       width: style.size,
       height: style.size,
@@ -1508,12 +1672,12 @@ const updateBrushCursorStyle = () => {
     if (brushCursorCircleInner) {
       brushCursorCircleInner.visible = false;
     }
-  } else if (tool === 'eraser') {
+  } else if (tool === "eraser") {
     brushCursorCircle.set({
       width: localEraserSize.value,
       height: localEraserSize.value,
-      fill: 'transparent',
-      stroke: '#ffffff',
+      fill: "transparent",
+      stroke: "#ffffff",
       strokeWidth: 2,
       dashPattern: null as any,
     });
@@ -1521,17 +1685,17 @@ const updateBrushCursorStyle = () => {
       brushCursorCircleInner.set({
         width: localEraserSize.value,
         height: localEraserSize.value,
-        fill: 'transparent',
-        stroke: '#000000',
+        fill: "transparent",
+        stroke: "#000000",
         strokeWidth: 1,
         visible: true,
       });
     }
     brushCursorGroup.opacity = 1;
   }
-  brushCursorCircle.around = 'center';
+  brushCursorCircle.around = "center";
   if (brushCursorCircleInner) {
-    brushCursorCircleInner.around = 'center';
+    brushCursorCircleInner.around = "center";
   }
 };
 
@@ -1549,25 +1713,25 @@ const syncBrushCursorVisibility = () => {
   if (!brushCursorEnabled.value) {
     hideBrushCursor();
     if (canvasContainer.value) {
-      canvasContainer.value.style.cursor = '';
-      canvasContainer.value.querySelectorAll('canvas').forEach((el) => {
-        (el as HTMLCanvasElement).style.cursor = '';
+      canvasContainer.value.style.cursor = "";
+      canvasContainer.value.querySelectorAll("canvas").forEach((el) => {
+        (el as HTMLCanvasElement).style.cursor = "";
       });
     }
     return;
   }
-  const isBrushMode = currentTool.value === 'brush' || currentTool.value === 'eraser';
+  const isBrushMode =
+    currentTool.value === "brush" || currentTool.value === "eraser";
   if (isBrushMode) {
     showBrushCursor();
   } else {
     hideBrushCursor();
   }
-  // 隐藏浏览器默认鼠标指针（笔刷/橡皮擦模式用自定义圆圈光标替代）
-  // 作用于 canvas 容器与内部所有 canvas 元素（防止 Leafer 内部元素可能自带 cursor）
   if (canvasContainer.value) {
-    canvasContainer.value.style.cursor = isBrushMode ? 'none' : '';
-    canvasContainer.value.querySelectorAll('canvas').forEach((el) => {
-      (el as HTMLCanvasElement).style.cursor = isBrushMode ? 'none' : '';
+    const cursorStyle = isBrushMode ? "none" : "";
+    canvasContainer.value.style.cursor = cursorStyle;
+    canvasContainer.value.querySelectorAll("canvas").forEach((el) => {
+      (el as HTMLCanvasElement).style.cursor = cursorStyle;
     });
   }
 };
@@ -1576,9 +1740,9 @@ const syncBrushCursorVisibility = () => {
 const destroyBrushCursor = () => {
   // 恢复浏览器默认指针，防止卸载后残留 cursor: none
   if (canvasContainer.value) {
-    canvasContainer.value.style.cursor = '';
-    canvasContainer.value.querySelectorAll('canvas').forEach((el) => {
-      (el as HTMLCanvasElement).style.cursor = '';
+    canvasContainer.value.style.cursor = "";
+    canvasContainer.value.querySelectorAll("canvas").forEach((el) => {
+      (el as HTMLCanvasElement).style.cursor = "";
     });
   }
   if (brushCursorCircle) {
@@ -1607,7 +1771,7 @@ const initBrushLayers = () => {
   if (!imageWidth.value || !imageHeight.value || !app) return;
 
   // 清除所有旧的笔刷
-  Object.values(canvasBrushesByLayer.value).forEach(brush => {
+  Object.values(canvasBrushesByLayer.value).forEach((brush) => {
     brush.getGroup().remove();
   });
   canvasBrushesByLayer.value = {};
@@ -1621,7 +1785,10 @@ const initBrushLayers = () => {
   effectiveBrushLayers.value.forEach((layerConfig) => {
     const layerBrushStyle: BrushStyle = {
       color: layerConfig.color || localBrushStyle.value.color,
-      opacity: layerConfig.opacity !== undefined ? layerConfig.opacity : localBrushStyle.value.opacity,
+      opacity:
+        layerConfig.opacity !== undefined
+          ? layerConfig.opacity
+          : localBrushStyle.value.opacity,
       size: layerConfig.size || localBrushStyle.value.size,
       minSize: localBrushStyle.value.minSize,
       maxSize: localBrushStyle.value.maxSize,
@@ -1631,7 +1798,7 @@ const initBrushLayers = () => {
     const brush = new CanvasBrush(
       imageWidth.value!,
       imageHeight.value!,
-      layerBrushStyle
+      layerBrushStyle,
     );
 
     contentLayer.add(brush.getGroup());
@@ -1640,14 +1807,15 @@ const initBrushLayers = () => {
 
   // 默认选中第一个图层
   if (!internalCurrentLayer.value) {
-    internalCurrentLayer.value = effectiveBrushLayers.value[0]?.value || DEFAULT_LAYER_VALUE;
+    internalCurrentLayer.value =
+      effectiveBrushLayers.value[0]?.value || DEFAULT_LAYER_VALUE;
   }
 
   updateAllLayersVisibility();
 };
 
 const updateAllLayersVisibility = () => {
-  Object.values(canvasBrushesByLayer.value).forEach(brush => {
+  Object.values(canvasBrushesByLayer.value).forEach((brush) => {
     const group = brush.getGroup();
     if (group) {
       (group as any).visible = true;
@@ -1657,11 +1825,11 @@ const updateAllLayersVisibility = () => {
 
 // 切换当前图层
 const setActiveLayer = (layerValue: string) => {
-  if (!effectiveBrushLayers.value.some(l => l.value === layerValue)) return;
+  if (!effectiveBrushLayers.value.some((l) => l.value === layerValue)) return;
   internalCurrentLayer.value = layerValue;
   if (!props.currentLayer) {
-    emit('update:currentLayer', layerValue);
-    emit('layerChange', layerValue);
+    emit("update:currentLayer", layerValue);
+    emit("layerChange", layerValue);
   }
 };
 
@@ -1673,9 +1841,21 @@ let brushSnapshotBeforeDraw: string | null = null;
 let brushSnapshotLayer: string | null = null;
 
 const handleBrushDown = (e: any) => {
-  if (currentTool.value !== 'brush' && currentTool.value !== 'eraser') return;
+  if (
+    currentTool.value !== "brush" &&
+    currentTool.value !== "eraser" &&
+    currentTool.value !== "lasso"
+  )
+    return;
   if (!app || !imageBox || !activeCanvasBrush.value) return;
   if (isSpacePressed.value) return;
+
+  if (currentTool.value === "lasso") {
+    isLassoDrawing.value = true;
+    const point = contentLayer.getBoxPoint({ x: e.x, y: e.y });
+    lassoOverlay?.start(point.x, point.y);
+    return;
+  }
 
   isDrawing.value = true;
   brushSnapshotLayer = effectiveCurrentLayer.value;
@@ -1689,11 +1869,16 @@ const handleBrushDown = (e: any) => {
   const point = contentLayer.getBoxPoint({ x: e.x, y: e.y });
 
   // 判断是否为擦除模式
-  const isErase = currentTool.value === 'eraser';
+  const isErase = currentTool.value === "eraser";
 
   // 根据模式绘制到当前激活图层
   if (isErase) {
-    activeCanvasBrush.value.erase(point.x, point.y, localEraserSize.value, localBrushStyle.value.continuity);
+    activeCanvasBrush.value.erase(
+      point.x,
+      point.y,
+      localEraserSize.value,
+      localBrushStyle.value.continuity,
+    );
   } else {
     activeCanvasBrush.value.draw(
       point.x,
@@ -1701,7 +1886,7 @@ const handleBrushDown = (e: any) => {
       localBrushStyle.value.size,
       localBrushStyle.value.color,
       localBrushStyle.value.opacity,
-      localBrushStyle.value.continuity
+      localBrushStyle.value.continuity,
     );
   }
 
@@ -1710,18 +1895,30 @@ const handleBrushDown = (e: any) => {
 };
 
 const handleBrushMove = (e: any) => {
-  if (!isDrawing.value || !activeCanvasBrush.value || !imageBox) return;
+  if (!isDrawing.value && !isLassoDrawing.value) return;
+  if (!activeCanvasBrush.value || !imageBox) return;
   if (isSpacePressed.value) return;
+
+  if (isLassoDrawing.value && currentTool.value === "lasso") {
+    const point = contentLayer.getBoxPoint({ x: e.x, y: e.y });
+    lassoOverlay?.addPoint(point.x, point.y);
+    return;
+  }
 
   // 获取相对于图片的坐标（与点标注相同的方式）
   const point = contentLayer.getBoxPoint({ x: e.x, y: e.y });
 
   // 判断是否为擦除模式
-  const isErase = currentTool.value === 'eraser';
+  const isErase = currentTool.value === "eraser";
 
   // 根据模式绘制到当前激活图层
   if (isErase) {
-    activeCanvasBrush.value.erase(point.x, point.y, localEraserSize.value, localBrushStyle.value.continuity);
+    activeCanvasBrush.value.erase(
+      point.x,
+      point.y,
+      localEraserSize.value,
+      localBrushStyle.value.continuity,
+    );
   } else {
     activeCanvasBrush.value.draw(
       point.x,
@@ -1729,7 +1926,7 @@ const handleBrushMove = (e: any) => {
       localBrushStyle.value.size,
       localBrushStyle.value.color,
       localBrushStyle.value.opacity,
-      localBrushStyle.value.continuity
+      localBrushStyle.value.continuity,
     );
   }
 
@@ -1738,11 +1935,39 @@ const handleBrushMove = (e: any) => {
 };
 
 const handleBrushUp = () => {
+  if (isLassoDrawing.value && currentTool.value === "lasso") {
+    isLassoDrawing.value = false;
+    if (!activeCanvasBrush.value || !lassoOverlay) return;
+
+    const points = lassoOverlay.close();
+    if (points.length >= 3) {
+      const beforeSnapshot = activeCanvasBrush.value.getImageData();
+      activeCanvasBrush.value.fillPolygon(points, localBrushStyle.value.color);
+
+      if (commandManager) {
+        const snapshotCommand = new BrushSnapshotCommand(
+          activeCanvasBrush.value,
+          beforeSnapshot,
+        );
+        commandManager.executeCommand(snapshotCommand);
+      }
+    }
+    return;
+  }
+
   isDrawing.value = false;
 
   // 如果有保存的快照，创建撤销命令（使用操作开始时的图层）
-  if (commandManager && brushSnapshotLayer && canvasBrushesByLayer.value[brushSnapshotLayer] && brushSnapshotBeforeDraw) {
-    const snapshotCommand = new BrushSnapshotCommand(canvasBrushesByLayer.value[brushSnapshotLayer], brushSnapshotBeforeDraw);
+  if (
+    commandManager &&
+    brushSnapshotLayer &&
+    canvasBrushesByLayer.value[brushSnapshotLayer] &&
+    brushSnapshotBeforeDraw
+  ) {
+    const snapshotCommand = new BrushSnapshotCommand(
+      canvasBrushesByLayer.value[brushSnapshotLayer],
+      brushSnapshotBeforeDraw,
+    );
     commandManager.executeCommand(snapshotCommand);
     brushSnapshotBeforeDraw = null;
     brushSnapshotLayer = null;
@@ -1763,7 +1988,7 @@ const handleBrushUp = () => {
 
 // 处理画布点击事件
 const handleCanvasTap = async (e: any) => {
-  if (currentTool.value !== 'point' || !app || !imageBox) return;
+  if (currentTool.value !== "point" || !app || !imageBox) return;
 
   // 如果编辑器正处于编辑状态（有点标注被选中），不创建新标注
   if (app.editor && app.editor.list && app.editor.list.length > 0) return;
@@ -1771,7 +1996,7 @@ const handleCanvasTap = async (e: any) => {
   // 检查是否点击在点标注元素上（遍历父级链）
   let target: any = e.target;
   while (target) {
-    if (target._element_tag === 'point-annotation') return;
+    if (target._element_tag === "point-annotation") return;
     target = target.parent;
   }
 
@@ -1779,8 +2004,12 @@ const handleCanvasTap = async (e: any) => {
   const point = contentLayer.getBoxPoint({ x: e.x, y: e.y });
 
   // 检查是否在图片范围内
-  if (point.x < 0 || point.x > (imageWidth.value || 0) ||
-      point.y < 0 || point.y > (imageHeight.value || 0)) {
+  if (
+    point.x < 0 ||
+    point.x > (imageWidth.value || 0) ||
+    point.y < 0 ||
+    point.y > (imageHeight.value || 0)
+  ) {
     return;
   }
 
@@ -1840,16 +2069,22 @@ const previousSelectedStates = new Map<string, boolean>();
 let isExternalSelectSync = false;
 
 const handlePointAnnotationSelected = (e: any) => {
-  if (currentTool.value === 'brush' || currentTool.value === 'eraser' || !app || !imageBox) return;
+  if (
+    currentTool.value === "brush" ||
+    currentTool.value === "eraser" ||
+    !app ||
+    !imageBox
+  )
+    return;
 
   const selectedIds = new Set<string>();
-  const newValues = Array.isArray(e.value) ? e.value : (e.value ? [e.value] : []);
+  const newValues = Array.isArray(e.value) ? e.value : e.value ? [e.value] : [];
   newValues.forEach((element: any) => {
     if (element.data?.id) selectedIds.add(element.data.id);
   });
 
   pointLayer.children.forEach((p: any) => {
-    if (p._element_tag !== 'point-annotation') return;
+    if (p._element_tag !== "point-annotation") return;
     const id = p.data?.id;
     const isSelected = selectedIds.has(id);
     const wasSelected = previousSelectedStates.get(id) ?? false;
@@ -1864,7 +2099,10 @@ const handlePointAnnotationSelected = (e: any) => {
 };
 
 // 创建点标注
-const createPointAnnotation = async (pixelX: number, pixelY: number): Promise<string | null> => {
+const createPointAnnotation = async (
+  pixelX: number,
+  pixelY: number,
+): Promise<string | null> => {
   if (!imageWidth.value || !imageHeight.value) return null;
 
   // 📍 创建点标注前，父组件可介入做业务判定
@@ -1872,16 +2110,18 @@ const createPointAnnotation = async (pixelX: number, pixelY: number): Promise<st
     const normalizedX = pixelX / (imageWidth.value || 1);
     const normalizedY = pixelY / (imageHeight.value || 1);
     const result = props.beforeCreatePoint(
-      pixelX, pixelY,
-      normalizedX, normalizedY,
-      pointAnnotations.value.length
+      pixelX,
+      pixelY,
+      normalizedX,
+      normalizedY,
+      pointAnnotations.value.length,
     );
     const allow = result instanceof Promise ? await result : result;
     if (!allow) return null;
   }
 
   // const id = `point_${generateUUID()}`;
-  const id = `point_${pointCounter.value}`
+  const id = `point_${pointCounter.value}`;
   // const label = `#${pointCounter.value}`;
   const order = pointCounter.value;
   const sequenceNumber = pointAnnotations.value.length + 1;
@@ -1902,9 +2142,13 @@ const createPointAnnotation = async (pixelX: number, pixelY: number): Promise<st
   };
 
   // 创建点标注元素
-  const pointElement = new PointAnnotationElement(pointData, pointStyle.value, () => {
-    emit("pointChange", [...pointAnnotations.value]);
-  });
+  const pointElement = new PointAnnotationElement(
+    pointData,
+    pointStyle.value,
+    () => {
+      emit("pointChange", [...pointAnnotations.value]);
+    },
+  );
   pointElement.setImageSize(imageWidth.value || 1, imageHeight.value || 1);
 
   pointElement.on(PointerEvent.ENTER, () => {
@@ -1920,13 +2164,18 @@ const createPointAnnotation = async (pixelX: number, pixelY: number): Promise<st
   //       保留这段逻辑是为了：
   //       1) 状态上保持一致性（工具切换时设置正确的可编辑状态）
   //       2) 如果未来把 hitChildren 改回 true，这个设置立即生效
-  if (currentTool.value === 'brush' || currentTool.value === 'eraser') {
+  if (currentTool.value === "brush" || currentTool.value === "eraser") {
     pointElement.label.editable = false;
   }
 
   // 使用命令模式添加到图层
   if (commandManager) {
-    const addCommand = new AddPointCommand(pointLayer, pointElement, pointAnnotations.value, pointData);
+    const addCommand = new AddPointCommand(
+      pointLayer,
+      pointElement,
+      pointAnnotations.value,
+      pointData,
+    );
     commandManager.executeCommand(addCommand);
   } else {
     pointLayer.add(pointElement);
@@ -1952,23 +2201,28 @@ const createPointAnnotation = async (pixelX: number, pixelY: number): Promise<st
 // 删除选中的点标注或清除笔刷内容
 const deleteSelected = () => {
   // 如果当前工具是笔刷，清除所有笔刷内容（笔刷禁用时不会走到这里）
-  if (currentTool.value === 'brush' || currentTool.value === 'eraser') {
+  if (currentTool.value === "brush" || currentTool.value === "eraser") {
     clearBrush();
     return;
   }
 
   // select 模式下未选中任何元素，清除所有
-  if (currentTool.value === 'select') {
+  if (currentTool.value === "select") {
     const selected = app?.editor?.list || [];
     // 禁用笔刷时只关心点标注
     let hasBrushContent = false;
     if (effectiveEnableBrush.value) {
-      hasBrushContent = Object.values(canvasBrushesByLayer.value).some(brush => brush?.hasContent?.());
+      hasBrushContent = Object.values(canvasBrushesByLayer.value).some(
+        (brush) => brush?.hasContent?.(),
+      );
     }
-    if (selected.length === 0 && (pointAnnotations.value.length > 0 || hasBrushContent)) {
+    if (
+      selected.length === 0 &&
+      (pointAnnotations.value.length > 0 || hasBrushContent)
+    ) {
       const confirmMsg = effectiveEnableBrush.value
-        ? '确定清除所有标注和笔刷绘制区域吗？'
-        : '确定清除所有标注吗？';
+        ? "确定清除所有标注和笔刷绘制区域吗？"
+        : "确定清除所有标注吗？";
       if (confirm(confirmMsg)) {
         clearAllAnnotationsAndBrush();
       }
@@ -1983,15 +2237,21 @@ const deleteSelected = () => {
 
   selected.forEach((element: any) => {
     // 使用 _element_tag 来识别点标注元素
-    if (element._element_tag === 'point-annotation') {
+    if (element._element_tag === "point-annotation") {
       // 使用命令模式从图层和数据中移除
       if (commandManager) {
-        const removeCommand = new RemovePointCommand(pointLayer, element, pointAnnotations.value);
+        const removeCommand = new RemovePointCommand(
+          pointLayer,
+          element,
+          pointAnnotations.value,
+        );
         commandManager.executeCommand(removeCommand);
       } else {
         pointLayer.remove(element);
         element.destroy();
-        const index = pointAnnotations.value.findIndex(p => p.id === element.data.id);
+        const index = pointAnnotations.value.findIndex(
+          (p) => p.id === element.data.id,
+        );
         if (index > -1) {
           pointAnnotations.value.splice(index, 1);
         }
@@ -2039,7 +2299,7 @@ const clearAllAnnotationsAndBrush = () => {
 
   // 清除所有图层的笔刷（仅当启用笔刷时）
   if (effectiveEnableBrush.value) {
-    Object.values(canvasBrushesByLayer.value).forEach(brush => brush.clear());
+    Object.values(canvasBrushesByLayer.value).forEach((brush) => brush.clear());
   }
 };
 
@@ -2054,7 +2314,7 @@ const resetCanvas = () => {
   if (commandManager) {
     commandManager = new CommandManager(100);
   }
-  loadStatus.value = 'idle';
+  loadStatus.value = "idle";
 };
 
 // 清除当前图层的笔刷内容（仅当启用笔刷时）
@@ -2063,7 +2323,11 @@ const clearBrush = () => {
   if (activeCanvasBrush.value) {
     if (commandManager) {
       const beforeSnapshot = activeCanvasBrush.value.getImageData();
-      const snapshotCommand = new BrushSnapshotCommand(activeCanvasBrush.value, beforeSnapshot, true);
+      const snapshotCommand = new BrushSnapshotCommand(
+        activeCanvasBrush.value,
+        beforeSnapshot,
+        true,
+      );
       commandManager.executeCommand(snapshotCommand);
     }
 
@@ -2078,7 +2342,11 @@ const clearAllBrushLayers = () => {
   Object.entries(canvasBrushesByLayer.value).forEach(([_layerValue, brush]) => {
     if (commandManager) {
       const beforeSnapshot = brush.getImageData();
-      const snapshotCommand = new BrushSnapshotCommand(brush, beforeSnapshot, true);
+      const snapshotCommand = new BrushSnapshotCommand(
+        brush,
+        beforeSnapshot,
+        true,
+      );
       commandManager.executeCommand(snapshotCommand);
     }
     brush.clear();
@@ -2104,7 +2372,9 @@ const getPointAnnotations = (): PointAnnotation[] => {
 // 更新指定标注点的 label（父组件通过 id 找到对应元素并更新名称）
 // 支持点标注后，父组件通过此方法改点标注点的名称
 const updatePointAnnotationLabel = (id: string, label: string): boolean => {
-  const element = pointLayer.children.find((el: any) => el.data?.id === id) as PointAnnotationElement;
+  const element = pointLayer.children.find(
+    (el: any) => el.data?.id === id,
+  ) as PointAnnotationElement;
   if (!element) return false;
   if (element.updateLabel) {
     element.updateLabel(label);
@@ -2126,7 +2396,7 @@ const createBrushFromPoints = (): boolean => {
   const points = [...pointAnnotations.value];
   if (points.length < 3) return false;
   points.sort((a, b) => a.sequenceNumber - b.sequenceNumber);
-  const pixelPoints = points.map(p => ({ x: p.pixel.x, y: p.pixel.y }));
+  const pixelPoints = points.map((p) => ({ x: p.pixel.x, y: p.pixel.y }));
 
   // 操作前保存快照（BrushSnapshotCommand 会在第一次 execute 时自动保存操作后快照）
   const beforeSnapshot = brush.getImageData();
@@ -2158,26 +2428,37 @@ const redo = () => {
   }
 };
 
-const getCurrentTool = (): "select" | "point" | "brush" | "eraser" => {
+const getCurrentTool = ():
+  | "select"
+  | "point"
+  | "brush"
+  | "eraser"
+  | "lasso" => {
   return currentTool.value;
 };
 
-const setTool = (tool: "select" | "point" | "brush" | "eraser") => {
-  // 笔刷禁用时，不允许切到 brush/eraser
-  if (!effectiveEnableBrush.value && (tool === 'brush' || tool === 'eraser')) {
+const setTool = (tool: "select" | "point" | "brush" | "eraser" | "lasso") => {
+  // 笔刷禁用时，不允许切到 brush/eraser/lasso
+  if (
+    !effectiveEnableBrush.value &&
+    (tool === "brush" || tool === "eraser" || tool === "lasso")
+  ) {
     return;
   }
   switch (tool) {
-    case 'point':
+    case "point":
       pointTool();
       break;
-    case 'brush':
+    case "brush":
       brushTool();
       break;
-    case 'eraser':
+    case "eraser":
       eraserTool();
       break;
-    case 'select':
+    case "lasso":
+      lassoTool();
+      break;
+    case "select":
       selectTool();
       break;
   }
@@ -2193,7 +2474,9 @@ const renumberSequenceNumbers = () => {
   // 2. 按数据顺序查找对应 DOM 元素并更新 circleText.text
   //    （注意：pointLayer.children 顺序可能与 pointAnnotations 不一致，比如 undo/redo 后）
   pointAnnotations.value.forEach((p, i) => {
-    const child = pointLayer.children.find((el: any) => el.data?.id === p.id) as PointAnnotationElement;
+    const child = pointLayer.children.find(
+      (el: any) => el.data?.id === p.id,
+    ) as PointAnnotationElement;
     if (child?.updateSequenceNumber) {
       child.updateSequenceNumber(i + 1);
     }
@@ -2201,14 +2484,18 @@ const renumberSequenceNumbers = () => {
 };
 
 const removePointAnnotation = (id: string): boolean => {
-  const index = pointAnnotations.value.findIndex(p => p.id === id);
+  const index = pointAnnotations.value.findIndex((p) => p.id === id);
   if (index === -1) return false;
 
   const element = pointLayer.children[index];
   if (!element) return false;
 
   if (commandManager) {
-    const removeCommand = new RemovePointCommand(pointLayer, element as any, pointAnnotations.value);
+    const removeCommand = new RemovePointCommand(
+      pointLayer,
+      element as any,
+      pointAnnotations.value,
+    );
     commandManager.executeCommand(removeCommand);
   } else {
     pointLayer.remove(element);
@@ -2226,17 +2513,22 @@ const removePointAnnotation = (id: string): boolean => {
 const findPointElement = (pointId: string): PointAnnotationElement | null => {
   if (!pointLayer || !pointLayer.children) return null;
   for (const el of pointLayer.children as any[]) {
-    if (el?._element_tag === 'point-annotation' && el.data?.id === pointId) {
+    if (el?._element_tag === "point-annotation" && el.data?.id === pointId) {
       return el as PointAnnotationElement;
     }
   }
   return null;
 };
 
-const findPointBySequenceNumber = (seq: number): { id: string; data: any } | null => {
+const findPointBySequenceNumber = (
+  seq: number,
+): { id: string; data: any } | null => {
   if (!pointLayer || !pointLayer.children) return null;
   for (const el of pointLayer.children as any[]) {
-    if (el?._element_tag === 'point-annotation' && el.data?.sequenceNumber === seq) {
+    if (
+      el?._element_tag === "point-annotation" &&
+      el.data?.sequenceNumber === seq
+    ) {
       return { id: el.data.id, data: { ...el.data } };
     }
   }
@@ -2272,7 +2564,9 @@ const setPointSelectState = (pointId: string, isSelected: boolean): boolean => {
       app.editor.select(element);
     } else {
       // 排除模式：从当前选中中移除目标点
-      const remaining = currentList.filter((el: any) => el.data?.id !== pointId);
+      const remaining = currentList.filter(
+        (el: any) => el.data?.id !== pointId,
+      );
       if (remaining.length === 0) {
         app.editor.cancel();
       } else {
@@ -2284,7 +2578,9 @@ const setPointSelectState = (pointId: string, isSelected: boolean): boolean => {
       }
     }
   } finally {
-    setTimeout(() => { isExternalSelectSync = false; }, 0);
+    setTimeout(() => {
+      isExternalSelectSync = false;
+    }, 0);
   }
   return true;
 };
@@ -2454,7 +2750,11 @@ declare global {
   left: 0;
   right: 0;
   bottom: 0;
-  background: linear-gradient(135deg, var(--loading-gradient-start, #f0edff) 0%, var(--loading-gradient-end, #e6f0ff) 100%);
+  background: linear-gradient(
+    135deg,
+    var(--loading-gradient-start, #f0edff) 0%,
+    var(--loading-gradient-end, #e6f0ff) 100%
+  );
   background-size: 200% 200%;
   animation: gradientShift var(--leafer-point-animation-gradient) ease-in-out
     infinite;
@@ -2774,5 +3074,4 @@ declare global {
   color: var(--leafer-point-color-primary);
   font-weight: 600;
 }
-
 </style>
