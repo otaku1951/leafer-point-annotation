@@ -338,6 +338,7 @@ import { tinykeys } from "tinykeys";
 import { PointAnnotationElement } from "@/elements/PointAnnotationElement";
 import { CanvasBrush } from "@/utils/CanvasBrush";
 import { LassoOverlay } from "@/utils/LassoOverlay";
+import { transformImage, type TransformDirection } from "@/utils/ImageTransformer";
 import BrushStylePanel from "./BrushStylePanel.vue";
 import type {
   PointAnnotation,
@@ -769,6 +770,13 @@ const loadImage = async (imageSrc?: string | undefined) => {
     imageBox.destroy();
   }
 
+  // 回收旧图片的 blob URL
+  const oldUrl = props.imageSource?.url;
+  if (oldUrl && oldUrl !== _imageSrc && blobUrls.has(oldUrl)) {
+    URL.revokeObjectURL(oldUrl);
+    blobUrls.delete(oldUrl);
+  }
+
   if (pointLayer && pointLayer.children) {
     pointLayer.children.forEach((el: any) => el.destroy());
     pointLayer.clear();
@@ -808,12 +816,8 @@ const loadImage = async (imageSrc?: string | undefined) => {
         id: props.imageSource?.id || "",
         isLocal: props.imageSource?.isLocal || false,
         file: props.imageSource?.file || undefined,
+        metaFile: props.imageSource?.metaFile || undefined,
       });
-      const currentUrl = props.imageSource?.url || "";
-      if (blobUrls.has(currentUrl)) {
-        URL.revokeObjectURL(currentUrl);
-        blobUrls.delete(currentUrl);
-      }
       fitImageToCanvas();
       initBrushLayer();
     });
@@ -840,6 +844,7 @@ const getImageInfo = () => {
     height: imageHeight.value,
     isLocal: props.imageSource?.isLocal || false,
     file: props.imageSource?.file || undefined,
+    metaFile: props.imageSource?.metaFile || undefined,
   };
 };
 
@@ -2317,6 +2322,63 @@ const resetCanvas = () => {
   loadStatus.value = "idle";
 };
 
+// 图片旋转/翻转（简化方案：先清空所有数据再变换图片）
+const transformCurrentImage = async (direction: TransformDirection) => {
+  if (!props.imageSource?.url) {
+    console.warn("[transformImage] 没有可变换的图片");
+    return;
+  }
+
+  const currentUrl = props.imageSource.url;
+  const currentFile = props.imageSource.file;
+
+  // 1. 清空所有现有数据
+  clearAllAnnotationsAndBrush();
+  if (commandManager) {
+    commandManager = new CommandManager(100);
+  }
+
+  // 2. 变换图片像素
+  try {
+    loadStatus.value = "loading";
+    emit("loadStart");
+
+    const { blob, blobUrl } = await transformImage(currentUrl, direction);
+
+    blobUrls.add(blobUrl);
+
+    // 从变换后的 blob 创建新 File
+    const baseName = currentFile?.name || "image";
+    const ext = (baseName.split(".").pop() || "png").toLowerCase();
+    const newFile = new File([blob], `transformed_${Date.now()}.${ext}`, {
+      type: `image/${ext === "jpg" ? "jpeg" : ext}`,
+    });
+
+    // 3. 更新 imageSource：file 为变换后的新文件，metaFile 始终保留原始文件
+    const isFirstTransform = !props.imageSource.metaFile && currentFile;
+    emit("update:imageSource", {
+      ...props.imageSource,
+      url: blobUrl,
+      width: 0,
+      height: 0,
+      file: newFile,
+      metaFile: isFirstTransform ? currentFile : props.imageSource.metaFile ?? currentFile,
+    });
+  } catch (error) {
+    loadStatus.value = "error";
+    emit("loadError", error);
+    console.error("图片变换失败:", error);
+  }
+};
+
+const rotateImage = async () => {
+  await transformCurrentImage("rotate90");
+};
+
+const flipImage = async (direction: "h" | "v" = "h") => {
+  await transformCurrentImage(direction === "h" ? "flipH" : "flipV");
+};
+
 // 清除当前图层的笔刷内容（仅当启用笔刷时）
 const clearBrush = () => {
   if (!effectiveEnableBrush.value) return;
@@ -2629,6 +2691,8 @@ defineExpose({
   clearAllAnnotations,
   clearAllAnnotationsAndBrush,
   resetCanvas,
+  rotateImage,
+  flipImage,
   zoomIn,
   zoomOut,
   resetZoom,

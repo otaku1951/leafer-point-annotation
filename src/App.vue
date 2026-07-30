@@ -123,6 +123,32 @@
       </div>
 
       <div class="control-group">
+        <h3>Image Transform (via ref API)</h3>
+        <p class="subtle">旋转/翻转图片会清空所有已有标注和笔刷数据（简化方案）</p>
+        <div class="multi-layer-row">
+          <button @click="pointAnnotation?.rotateImage()">↻ 顺时针旋转 90°</button>
+          <button @click="pointAnnotation?.flipImage('h')">⇆ 水平翻转</button>
+          <button @click="pointAnnotation?.flipImage('v')">⇅ 垂直翻转</button>
+        </div>
+        <div v-if="transformedFilePreviewUrl || metaFilePreviewUrl" class="preview-row">
+          <div v-if="transformedFilePreviewUrl" class="preview-item">
+            <span class="preview-label">当前 file（变换后）</span>
+            <img :src="transformedFilePreviewUrl" alt="transformed file" />
+            <span class="preview-meta" v-if="localImageInfo?.file">
+              {{ localImageInfo.file.name }} · {{ (localImageInfo.file.size / 1024).toFixed(1) }} KB
+            </span>
+          </div>
+          <div v-if="metaFilePreviewUrl" class="preview-item">
+            <span class="preview-label">metaFile（原始）</span>
+            <img :src="metaFilePreviewUrl" alt="meta file" />
+            <span class="preview-meta" v-if="localImageInfo?.metaFile">
+              {{ localImageInfo.metaFile.name }} · {{ (localImageInfo.metaFile.size / 1024).toFixed(1) }} KB
+            </span>
+          </div>
+        </div>
+      </div>
+
+      <div class="control-group">
         <h3>Brush Mask Export</h3>
         <div class="mask-options">
           <label>
@@ -504,6 +530,8 @@ const lastAddedPointId = ref<string | null>(null)
 // 本地选图相关：loadSuccess 事件推送的图片信息
 const localImageInfo = ref<any>(null)  // { url, width, height, isLocal, file? }
 const localImageUploadLog = ref<string>('')
+const transformedFilePreviewUrl = ref<string>('')
+const metaFilePreviewUrl = ref<string>('')
 
 // 用于 UI 轮询显示当前笔刷样式（每 500ms 触发一次刷新）
 const brushStyleTick = ref(0)
@@ -655,6 +683,22 @@ const handleLoadSuccess = (info?: any) => {
   localImageInfo.value = info || null
   localImageUploadLog.value = ''
   console.log('[App.vue] loadSuccess payload:', info)
+
+  // 生成 file 和 metaFile 的预览 URL 用于验证
+  if (transformedFilePreviewUrl.value) {
+    URL.revokeObjectURL(transformedFilePreviewUrl.value)
+    transformedFilePreviewUrl.value = ''
+  }
+  if (metaFilePreviewUrl.value) {
+    URL.revokeObjectURL(metaFilePreviewUrl.value)
+    metaFilePreviewUrl.value = ''
+  }
+  if (info?.file) {
+    transformedFilePreviewUrl.value = URL.createObjectURL(info.file)
+  }
+  if (info?.metaFile) {
+    metaFilePreviewUrl.value = URL.createObjectURL(info.metaFile)
+  }
 }
 
 // 处理图片加载失败
@@ -1140,6 +1184,44 @@ pre {
   font-size: 13px;
   color: #888;
   margin: 0 0 8px 0;
+}
+
+.preview-row {
+  display: flex;
+  gap: 12px;
+  margin-top: 12px;
+  flex-wrap: wrap;
+}
+
+.preview-item {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  padding: 8px;
+  border: 1px solid #e0e0e0;
+  border-radius: 6px;
+  background: #fafafa;
+}
+
+.preview-label {
+  font-size: 12px;
+  color: #666;
+  font-weight: 500;
+}
+
+.preview-item img {
+  max-width: 120px;
+  max-height: 120px;
+  object-fit: contain;
+  border: 1px solid #ddd;
+  border-radius: 4px;
+  background: #fff;
+}
+
+.preview-meta {
+  font-size: 11px;
+  color: #999;
 }
 
 .active-btn {

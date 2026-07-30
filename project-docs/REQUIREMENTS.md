@@ -62,6 +62,10 @@
 | P0-005 | 提供 `loadStart` / `loadSuccess` / `loadError` 事件 | ⭐⭐⭐ | ✅ |
 | P0-006 | 图片加载成功后画布自动适应图片尺寸 | ⭐⭐⭐ | ✅ |
 | P0-007 | 通过 `options.canvasBackground` 自定义画布背景色 | ⭐⭐ | ✅ |
+| P0-008 | `rotateImage()`：顺时针旋转图片 90°（清空所有标注和笔刷数据） | ⭐⭐ | ✅ |
+| P0-009 | `flipImage(direction)`：翻转图片（`'h'` 水平翻转 / `'v'` 垂直翻转，清空所有标注和笔刷数据） | ⭐⭐ | ✅ |
+| P0-010 | 图片旋转/翻转通过 Canvas 2D 像素级变换实现，生成新 Blob URL 并重新加载 | ⭐⭐ | ✅ |
+| P0-011 | 变换后 `imageSource.file` 为变换后的新 File，`imageSource.metaFile` 始终指向原始文件 | ⭐⭐⭐ | ✅ |
 
 ### 2.2 点标注功能（P1-XXX）
 
@@ -196,7 +200,7 @@
 | 分类 | 已暴露方法 |
 |------|-----------|
 | 点标注 | `getPointAnnotations`, `createPointAnnotation`, `removePointAnnotation`, `updatePointAnnotationLabel` |
-| 图片 & 画布 | `getImageInfo`, `loadImage` |
+| 图片 & 画布 | `getImageInfo`, `resetCanvas`, `rotateImage`, `flipImage` |
 | 工具切换 | `getCurrentTool`, `setTool`, `selectTool`, `pointTool`, `brushTool`, `eraserTool`, `lassoTool` |
 | 删除 / 清空 | `deleteSelected`, `clearAllAnnotationsAndBrush`, `clearBrush`, `clearAllBrushLayers` |
 | 笔刷图层 | `getCurrentLayer`, `setActiveLayer`, `getAllLayers` |

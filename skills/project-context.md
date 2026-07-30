@@ -36,6 +36,7 @@
 - 笔刷可调：颜色、透明度（Group.opacity）、大小、连续性阈值
 - 橡皮擦工具：擦除当前图层内容；**橡皮擦尺寸独立配置**（`eraserSize`，未设置时与 `size` 相同）
 - 套索工具：自由绘制闭合区域，填充/擦除，与笔刷共享颜色和 undo/redo
+- 图片旋转与翻转：顺时针 90° 旋转、水平翻转、垂直翻转（简化方案，清空现有数据后变换像素重新加载）
 - `clearBrush()` / `clearAllBrushLayers()` 清空笔刷
 - 图层切换：`setActiveLayer(value)` 或 `v-model:current-layer`
 - **撤销/重做**：基于 ImageData 快照（BrushSnapshotCommand）
@@ -113,7 +114,8 @@
 | `width` | `number` | 图片宽度（加载成功后填充） |
 | `height` | `number` | 图片高度（加载成功后填充） |
 | `isLocal` | `boolean` | 是否为本地图片 |
-| `file` | `File` | 原始文件对象（本地选择时有值） |
+| `file` | `File` | 当前图片文件（旋转/翻转后为变换后的新文件） |
+| `metaFile` | `File` | 原始未变换的图片文件（不受旋转/翻转影响） |
 
 ### 3.2 OptionsSource 关键字段
 
@@ -216,7 +218,7 @@ import {
 |--------|------|---------|
 | `point-change` | `(points: PointAnnotation[])` | 点新增/删除/修改/重排 |
 | `load-start` | - | 开始加载图片 |
-| `load-success` | `{ url, width, height, isLocal, file? }` | 图片加载成功（本地选图时 `isLocal=true`，`file` 为原始 `File` 对象，可直接用于后端 multipart 上传） |
+| `load-success` | `{ url, width, height, isLocal, file?, metaFile? }` | 图片加载成功（`file` 为当前文件，`metaFile` 为原始文件；旋转/翻转后 `file` 为变换后的新文件，`metaFile` 保持原始不变） |
 | `load-error` | `{ error }` | 图片加载失败 |
 | `undo-state-change` | `{ canUndo }` | 撤销栈状态变化 |
 | `redo-state-change` | `{ canRedo }` | 重做栈状态变化 |
@@ -240,8 +242,12 @@ import {
 - `findPointBySequenceNumber(seq)` - 按圆圈内显示的数字序号查找点，返回 `{ id, data }` 或 null（跨实例联动时，按视觉序号匹配更可靠）
 
 ### 5.2 图片 & 画布
-- `getImageInfo()` - ✨ `{ url, width, height, isLocal, file? }`（本地选图时有 `file` 原始 `File` 对象）
+- `getImageInfo()` - ✨ `{ url, width, height, isLocal, file?, metaFile? }`（`file` 为当前文件，`metaFile` 为原始未变换的文件）
 - `resetCanvas()` - ✨ 重置画布到无图片初始化状态（清除所有标注、笔刷、撤销栈）
+- `rotateImage()` - ✨ 顺时针旋转图片 90°（清空所有标注和笔刷数据）
+- `flipImage(direction?)` - ✨ 翻转图片：`'h'` 水平翻转（默认），`'v'` 垂直翻转（清空所有标注和笔刷数据）
+
+> **图片旋转/翻转说明**：采用简化方案——执行时先清空所有已有标注和笔刷数据，再对图片像素进行 Canvas 2D 变换并重新加载。变换后 `file` 为变换后的新 `File`，`metaFile` 始终指向原始文件。
 
 > **图片加载说明**：图片加载完全通过 `props.imageSource` 控制，不再对外暴露 `loadImage()` 和 `openFileDialog()` 方法。组件内部选择图片后通过 `v-model:imageSource` 自动同步到父组件。
 
@@ -305,6 +311,7 @@ leafer-point-annotation/
 │   ├── utils/
 │   │   ├── CanvasBrush.ts             # ✨ 笔刷底层（canvas/ctx、绘制、fillPolygon、ImageData 快照）
 │   │   ├── LassoOverlay.ts            # ✨ 套索工具（自由绘制闭合区域、黑白双线轨迹、缩放补偿）
+│   │   ├── ImageTransformer.ts        # ✨ 图片变换工具（Canvas 2D 实现旋转 90°、水平/垂直翻转）
 │   │   ├── BrushCommands.ts           # BrushSnapshotCommand（笔刷 undo/redo 命令）
 │   │   ├── PointCommands.ts           # AddPointCommand / RemovePointCommand（点 undo/redo 命令）
 │   │   ├── BrushStroke.ts             # 笔画数据结构
@@ -423,6 +430,13 @@ git push
 - **内部 TypeScript 用 camelCase**：`imageSource`、`currentLayer`、`pointStyle`
 - `PointStyle` / `BrushStyle` 的字段名是 camelCase（circleFill, circleStroke 等）
 
+### 8.6 图片变换（ImageTransformer.ts）
+- **方案**：简化方案，执行变换前先清空所有标注和笔刷数据
+- **流程**：保存当前数据 → Canvas 2D 像素变换 → 生成新 Blob URL → 通过 `update:imageSource` 触发 `loadImage` 重新加载
+- **支持操作**：`rotate90`（顺时针 90°）、`flipH`（水平翻转）、`flipV`（垂直翻转）
+- **`file` vs `metaFile`**：变换后 `file` 为新 File 对象，`metaFile` 始终保持原始文件引用
+- **Blob URL 生命周期**：`loadImage` 开头统一回收旧 blob URL，LOADED 回调不再提前回收
+
 ---
 
 ## 9. 常见开发问题速查
@@ -465,6 +479,11 @@ git push
 - 使用方式不同：笔刷是连续涂抹，套索是先画闭合路径再填充
 - 共享配置：颜色、透明度、图层、undo/redo 完全共用
 - 套索轨迹：黑白双线高对比度，默认固定屏幕大小（`lassoFixedSizeOnZoom=true`）
+
+### Q11. 图片旋转/翻转后标注数据会保留吗？
+- 不会。旋转/翻转采用简化方案，会清空所有已有点标注和笔刷数据
+- 建议在开始标注前先调整好图片方向
+- 变换后 `file` 为新 File 对象，`metaFile` 保持原始文件引用
 
 ---
 

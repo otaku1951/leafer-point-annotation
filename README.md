@@ -147,7 +147,8 @@ function handleLoadSuccess(info: any) {
 | `width` | `number` | 图片宽度（加载成功后填充） |
 | `height` | `number` | 图片高度（加载成功后填充） |
 | `isLocal` | `boolean` | 是否为本地图片（本地选择时为 true） |
-| `file` | `File` | 原始文件对象（本地选择时有值，可直接用于后端 multipart 上传） |
+| `file` | `File` | 当前图片文件对象（经过旋转/翻转后为变换后的新文件，可直接用于后端 multipart 上传） |
+| `metaFile` | `File` | 原始未变换的图片文件（始终指向最初上传的原图，不受旋转/翻转影响） |
 
 > **单一数据源**：图片加载完全依赖 `props.imageSource`。不传 `imageSource` 时，组件显示大面积上传区域，支持**点击选择文件**和**拖拽文件**两种本地加载方式。
 > 
@@ -344,7 +345,7 @@ async function beforeCreatePoint(x: number, y: number, nx: number, ny: number, c
 |------|------|---------|
 | `point-change` | `(points: PointAnnotation[])` | 点新增 / 删除 / 修改 / 重排 |
 | `load-start` | - | 开始加载图片 |
-| `load-success` | `{ url, width, height, isLocal, file? }` | 图片加载成功（本地图片时 `isLocal=true`，`file` 为原始 `File` 对象，可直接用于后端 multipart 上传） |
+| `load-success` | `{ url, width, height, isLocal, file?, metaFile? }` | 图片加载成功（`file` 为当前文件，`metaFile` 为原始文件；旋转/翻转后 `file` 为变换后的新文件，`metaFile` 保持原始不变） |
 | `load-error` | `{ error }` | 图片加载失败 |
 | `undo-state-change` | `{ canUndo }` | 撤销栈状态变化 |
 | `redo-state-change` | `{ canRedo }` | 重做栈状态变化 |
@@ -444,8 +445,12 @@ annotationRef.value?.getMaskBlob()                // 导出当前图层 Blob（�
 
 | 方法 | 说明 |
 |------|------|
-| `getImageInfo()` | `{ url, width, height, isLocal, file? }`（本地选图时有 `file` 原始 `File` 对象） |
+| `getImageInfo()` | `{ url, width, height, isLocal, file?, metaFile? }`（`file` 为当前文件，`metaFile` 为原始未变换的文件） |
 | `resetCanvas()` | 重置画布到无图片初始化状态（清除所有标注、笔刷、撤销栈） |
+| `rotateImage()` | 顺时针旋转图片 90°（会清空所有标注和笔刷数据） |
+| `flipImage(direction?)` | 翻转图片：`'h'` 水平翻转（默认），`'v'` 垂直翻转（会清空所有标注和笔刷数据） |
+
+> **图片旋转/翻转说明**：旋转和翻转采用简化方案——执行时先清空所有已有标注和笔刷数据，再对图片像素进行 Canvas 2D 变换并重新加载。因此建议**先调整图片方向，再开始标注**。变换后 `file` 为变换后的新 `File` 对象，`metaFile` 始终指向原始文件。
 
 > **图片加载说明**：图片加载完全通过 `props.imageSource` 控制，不再对外暴露 `loadImage()` 和 `openFileDialog()` 方法。组件内部选择图片后通过 `v-model:imageSource` 自动同步到父组件。
 
@@ -712,6 +717,43 @@ function useLasso() {
 >
 > **`lassoFixedSizeOnZoom`**：控制套索轨迹是否随画布缩放而变粗。默认 `true`（固定屏幕像素大小，类似标注点的 `fixedSizeOnZoom`），设为 `false` 则线宽随画布缩放变化。
 
+### 图片旋转与翻转
+
+通过 ref API 对图片进行顺时针 90° 旋转、水平翻转或垂直翻转。变换会清空所有已有标注和笔刷数据，建议在标注前调整好图片方向。
+
+```vue
+<template>
+  <PointAnnotation
+    ref="annotationRef"
+    :image-source="imageSource"
+    @load-success="handleLoadSuccess"
+  />
+  <div class="my-toolbar">
+    <button @click="() => annotationRef.value?.rotateImage()">↻ 顺时针 90°</button>
+    <button @click="() => annotationRef.value?.flipImage('h')">⇆ 水平翻转</button>
+    <button @click="() => annotationRef.value?.flipImage('v')">⇅ 垂直翻转</button>
+  </div>
+</template>
+
+<script setup lang="ts">
+import { ref } from 'vue'
+import PointAnnotation from '@zzalai/leafer-point-annotation'
+import '@zzalai/leafer-point-annotation/dist/leafer-point-annotation.css'
+
+const annotationRef = ref<InstanceType<typeof PointAnnotation> | null>(null)
+
+function handleLoadSuccess(info: any) {
+  console.log('当前文件：', info.file)       // 变换后的新 File
+  console.log('原始文件：', info.metaFile)   // 始终指向原始上传的文件
+}
+</script>
+```
+
+> **`file` vs `metaFile`**：
+> - `file`：当前图片文件。每次旋转/翻转后会替换为变换后的新 `File` 对象
+> - `metaFile`：原始未变换的图片文件。第一次变换时自动记录，后续变换保持不变
+> - 无需旋转/翻转时，`metaFile` 不存在，`file` 即为原始文件
+
 ### 点标注前回调（beforeCreatePoint）
 
 ```vue
@@ -957,6 +999,7 @@ src/
 ├── utils/
 │   ├── CanvasBrush.ts             # 笔刷底层（canvas + 绘制快照）
 │   ├── LassoOverlay.ts            # 套索工具（自由绘制闭合区域，黑白双线高对比度）
+│   ├── ImageTransformer.ts        # 图片变换工具（旋转 90°、水平/垂直翻转，Canvas 2D 实现）
 │   ├── BrushCommands.ts           # 笔刷撤销命令
 │   ├── PointCommands.ts           # 点撤销命令
 │   ├── BrushStroke.ts             # 笔画数据

@@ -6,6 +6,7 @@ export interface ImageSource {
   height?: number;
   isLocal?: boolean;
   file: File | null;
+  metaFile?: File | null;  // 原始未变换的图片文件（经过旋转/翻转后 file 为新文件，metaFile 保持原始）
 }
 
 // 组件配置项（props.options 的类型）

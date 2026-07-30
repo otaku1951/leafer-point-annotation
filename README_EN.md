@@ -152,7 +152,8 @@ function handleLoadSuccess(info: any) {
 | `width` | `number` | Image width (filled after loading) |
 | `height` | `number` | Image height (filled after loading) |
 | `isLocal` | `boolean` | Whether the image is from local upload |
-| `file` | `File` | Original file object (available for local uploads, can be used directly for backend multipart upload) |
+| `file` | `File` | Current image file (after rotation/flip, this is the transformed new file; can be used directly for backend multipart upload) |
+| `metaFile` | `File` | Original untransformed image file (always points to the initially uploaded image, unaffected by rotation/flip) |
 
 > **Single Data Source**: Image loading is fully controlled by `props.imageSource`. When not provided, the component displays a large upload area supporting **click to select** and **drag-and-drop** file loading.
 > 
@@ -347,7 +348,7 @@ Controlled layer switching. For example:
 |-------|-----------|----------------|
 | `point-change` | `(points: PointAnnotation[])` | Point added / deleted / modified / renumbered |
 | `load-start` | - | Image starts loading |
-| `load-success` | `{ url, width, height, isLocal, file? }` | Image loads successfully (`isLocal=true` for local uploads, `file` is the original File object) |
+| `load-success` | `{ url, width, height, isLocal, file?, metaFile? }` | Image loads successfully (`file` is the current file, `metaFile` is the original; after rotation/flip, `file` is the transformed new file, `metaFile` remains unchanged) |
 | `load-error` | `{ error }` | Image loading fails |
 | `undo-state-change` | `{ canUndo }` | Undo stack state changes |
 | `redo-state-change` | `{ canRedo }` | Redo stack state changes |
@@ -447,8 +448,12 @@ annotationRef.value?.getMaskBlob()                  // Export current layer as B
 
 | Method | Description |
 |--------|-------------|
-| `getImageInfo()` | `{ url, width, height, isLocal, file? }` (original `File` object available for local uploads) |
+| `getImageInfo()` | `{ url, width, height, isLocal, file?, metaFile? }` (`file` is the current file, `metaFile` is the original untransformed file) |
 | `resetCanvas()` | Reset canvas to no-image initialization state (clears all annotations, brush strokes, and undo/redo stack) |
+| `rotateImage()` | Rotate image 90° clockwise (clears all annotations and brush data) |
+| `flipImage(direction?)` | Flip image: `'h'` horizontal (default), `'v'` vertical (clears all annotations and brush data) |
+
+> **Image Rotation/Flip Note**: Rotation and flip use a simplified approach — all existing annotations and brush data are cleared first, then the image pixels are transformed via Canvas 2D and reloaded. It's recommended to **adjust image orientation before starting annotation**. After transformation, `file` is the new transformed `File` object, `metaFile` always points to the original.
 
 > **Image Loading Note**: Image loading is fully controlled by `props.imageSource`. The `loadImage()` and `openFileDialog()` methods are no longer exposed. When the user selects an image internally, it's automatically synced to the parent via `v-model:imageSource`.
 
@@ -715,6 +720,43 @@ function useLasso() {
 >
 > **`lassoFixedSizeOnZoom`**: Controls whether the lasso path thickens with canvas zoom. Default `true` (fixed screen pixel size, similar to point annotation's `fixedSizeOnZoom`). Set to `false` for line width to scale with canvas zoom.
 
+### Image Rotation & Flip
+
+Rotate images 90° clockwise or flip horizontally/vertically via the ref API. Rotation/flip clears all existing annotations and brush data, so it's recommended to adjust image orientation before starting annotation.
+
+```vue
+<template>
+  <PointAnnotation
+    ref="annotationRef"
+    :image-source="imageSource"
+    @load-success="handleLoadSuccess"
+  />
+  <div class="my-toolbar">
+    <button @click="() => annotationRef.value?.rotateImage()">↻ 90° Clockwise</button>
+    <button @click="() => annotationRef.value?.flipImage('h')">⇆ Flip Horizontal</button>
+    <button @click="() => annotationRef.value?.flipImage('v')">⇅ Flip Vertical</button>
+  </div>
+</template>
+
+<script setup lang="ts">
+import { ref } from 'vue'
+import PointAnnotation from '@zzalai/leafer-point-annotation'
+import '@zzalai/leafer-point-annotation/dist/leafer-point-annotation.css'
+
+const annotationRef = ref<InstanceType<typeof PointAnnotation> | null>(null)
+
+function handleLoadSuccess(info: any) {
+  console.log('Current file:', info.file)       // New transformed File
+  console.log('Original file:', info.metaFile)  // Always the originally uploaded file
+}
+</script>
+```
+
+> **`file` vs `metaFile`**:
+> - `file`: Current image file. Replaced with a new transformed `File` object after each rotation/flip
+> - `metaFile`: Original untransformed image file. Recorded on first transformation and stays unchanged afterwards
+> - When no rotation/flip has been applied, `metaFile` is not present and `file` is the original
+
 ### Pre-create Callback (beforeCreatePoint)
 
 ```vue
@@ -958,6 +1000,7 @@ src/
 ├── utils/
 │   ├── CanvasBrush.ts             # Brush core (canvas + drawing snapshot)
 │   ├── LassoOverlay.ts            # Lasso tool (freehand closed region, high-contrast black-white path)
+│   ├── ImageTransformer.ts        # Image transform utility (rotate 90°, horizontal/vertical flip, Canvas 2D)
 │   ├── BrushCommands.ts           # Brush undo commands
 │   ├── PointCommands.ts           # Point undo commands
 │   ├── BrushStroke.ts             # Brush stroke data

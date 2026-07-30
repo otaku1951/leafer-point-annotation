@@ -43,6 +43,7 @@
 │   元素封装层    │ │   工具类层       │ │   类型定义层     │
 │ PointAnnotation │ │ CanvasBrush.ts   │ │  types/index.ts  │
 │ Element.ts      │ │ LassoOverlay.ts  │ │                  │
+│                 │ │ ImageTransformer  │ │                  │
 │                 │ │ BrushCommands.ts │ │                  │
 │                 │ │ PointCommands.ts │ │                  │
 │                 │ │ BrushStroke.ts   │ │                  │
@@ -83,6 +84,7 @@
 |------|------|
 | `src/utils/CanvasBrush.ts` | 笔刷底层：每个图层一个实例，含 canvas/ctx、stroke/clear/fillPolygon/getImageData/hasContent/getGroup 等 |
 | `src/utils/LassoOverlay.ts` | 套索工具：自由绘制闭合区域，黑白双线高对比度轨迹，支持固定屏幕大小 |
+| `src/utils/ImageTransformer.ts` | 图片变换工具：基于 Canvas 2D 实现顺时针 90° 旋转、水平/垂直翻转，返回变换后的 Blob 和 Blob URL |
 | `src/utils/BrushCommands.ts` | 笔刷相关命令（撤销/重做用）：`BrushSnapshotCommand` 基于 ImageData 快照 |
 | `src/utils/PointCommands.ts` | 点标注相关命令：`AddPointCommand`、`RemovePointCommand` |
 | `src/utils/BrushStroke.ts` | 笔刷笔画数据结构与辅助函数（已由 CanvasBrush 接管核心绘制，主要供数据导出用） |
@@ -131,7 +133,8 @@ update:imageSource                              // 组件内部选择图片后�
 | `width` | `number` | 图片宽度（加载成功后填充） |
 | `height` | `number` | 图片高度（加载成功后填充） |
 | `isLocal` | `boolean` | 是否为本地图片 |
-| `file` | `File` | 原始文件对象（本地选择时有值） |
+| `file` | `File` | 当前图片文件（旋转/翻转后为变换后的新文件） |
+| `metaFile` | `File` | 原始未变换的图片文件（不受旋转/翻转影响） |
 
 **beforeCreatePoint 触发流程（必知）**：
 
@@ -247,8 +250,10 @@ App (leafer-ui)
 | `removePointAnnotation(id)` | 程序化删除一个点 |
 | `updatePointAnnotationLabel(id, label)` | 修改某个点的 label 文案 |
 | **图片 & 画布** | |
-| `getImageInfo()` | 返回 `{ url, width, height, isLocal, file? }`（本地选图时有 `file` 原始 `File` 对象） |
+| `getImageInfo()` | 返回 `{ url, width, height, isLocal, file?, metaFile? }`（`file` 为当前文件，`metaFile` 为原始未变换的文件） |
 | `resetCanvas()` | 重置画布到无图片初始化状态（清除所有标注、笔刷、撤销栈） |
+| `rotateImage()` | 顺时针旋转图片 90°（清空所有标注和笔刷数据） |
+| `flipImage(direction?)` | 翻转图片：`'h'` 水平翻转（默认），`'v'` 垂直翻转（清空所有标注和笔刷数据） |
 | **工具切换** | |
 | `getCurrentTool()` | 返回 `'select'/'point'/'brush'/'eraser'/'lasso'` |
 | `setTool(tool)` | 切到指定工具（受 enableBrush 限制） |
