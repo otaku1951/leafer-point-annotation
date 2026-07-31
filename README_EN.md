@@ -451,6 +451,7 @@ annotationRef.value?.getMaskBlob()                  // Export current layer as B
 | `getImageInfo()` | `{ url, width, height, isLocal, file?, metaFile? }` (`file` is the current file, `metaFile` is the original untransformed file) |
 | `resetCanvas()` | Reset canvas to no-image initialization state (clears all annotations, brush strokes, and undo/redo stack) |
 | `rotateImage()` | Rotate image 90° clockwise (clears all annotations and brush data) |
+| `rotateImageLeft()` | Rotate image 90° counter-clockwise (clears all annotations and brush data) |
 | `flipImage(direction?)` | Flip image: `'h'` horizontal (default), `'v'` vertical (clears all annotations and brush data) |
 
 > **Image Rotation/Flip Note**: Rotation and flip use a simplified approach — all existing annotations and brush data are cleared first, then the image pixels are transformed via Canvas 2D and reloaded. It's recommended to **adjust image orientation before starting annotation**. After transformation, `file` is the new transformed `File` object, `metaFile` always points to the original.
@@ -733,6 +734,7 @@ Rotate images 90° clockwise or flip horizontally/vertically via the ref API. Ro
   />
   <div class="my-toolbar">
     <button @click="() => annotationRef.value?.rotateImage()">↻ 90° Clockwise</button>
+    <button @click="() => annotationRef.value?.rotateImageLeft()">↺ 90° Counter-Clockwise</button>
     <button @click="() => annotationRef.value?.flipImage('h')">⇆ Flip Horizontal</button>
     <button @click="() => annotationRef.value?.flipImage('v')">⇅ Flip Vertical</button>
   </div>

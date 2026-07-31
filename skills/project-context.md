@@ -245,6 +245,7 @@ import {
 - `getImageInfo()` - ✨ `{ url, width, height, isLocal, file?, metaFile? }`（`file` 为当前文件，`metaFile` 为原始未变换的文件）
 - `resetCanvas()` - ✨ 重置画布到无图片初始化状态（清除所有标注、笔刷、撤销栈）
 - `rotateImage()` - ✨ 顺时针旋转图片 90°（清空所有标注和笔刷数据）
+- `rotateImageLeft()` - ✨ 逆时针旋转图片 90°（清空所有标注和笔刷数据）
 - `flipImage(direction?)` - ✨ 翻转图片：`'h'` 水平翻转（默认），`'v'` 垂直翻转（清空所有标注和笔刷数据）
 
 > **图片旋转/翻转说明**：采用简化方案——执行时先清空所有已有标注和笔刷数据，再对图片像素进行 Canvas 2D 变换并重新加载。变换后 `file` 为变换后的新 `File`，`metaFile` 始终指向原始文件。
@@ -433,7 +434,8 @@ git push
 ### 8.6 图片变换（ImageTransformer.ts）
 - **方案**：简化方案，执行变换前先清空所有标注和笔刷数据
 - **流程**：保存当前数据 → Canvas 2D 像素变换 → 生成新 Blob URL → 通过 `update:imageSource` 触发 `loadImage` 重新加载
-- **支持操作**：`rotate90`（顺时针 90°）、`flipH`（水平翻转）、`flipV`（垂直翻转）
+- **支持操作**：`rotate90`（顺时针 90°）、`rotate270`（逆时针 90°）、`flipH`（水平翻转）、`flipV`（垂直翻转）
+- **Ref API**：`rotateImage()` / `rotateImageLeft()` / `flipImage('h'|'v')`
 - **`file` vs `metaFile`**：变换后 `file` 为新 File 对象，`metaFile` 始终保持原始文件引用
 - **Blob URL 生命周期**：`loadImage` 开头统一回收旧 blob URL，LOADED 回调不再提前回收
 

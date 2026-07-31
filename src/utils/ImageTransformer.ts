@@ -1,4 +1,4 @@
-export type TransformDirection = 'rotate90' | 'flipH' | 'flipV';
+export type TransformDirection = 'rotate90' | 'rotate270' | 'flipH' | 'flipV';
 
 export interface TransformedImage {
   blobUrl: string;
@@ -37,6 +37,16 @@ const createTransformedBlob = (
     ctx.save();
     ctx.translate(h, 0);
     ctx.rotate(Math.PI / 2);
+    ctx.drawImage(img, 0, 0);
+    ctx.restore();
+  } else if (direction === 'rotate270') {
+    canvas = document.createElement('canvas');
+    canvas.width = h;
+    canvas.height = w;
+    ctx = canvas.getContext('2d')!;
+    ctx.save();
+    ctx.translate(0, w);
+    ctx.rotate(-Math.PI / 2);
     ctx.drawImage(img, 0, 0);
     ctx.restore();
   } else if (direction === 'flipH') {

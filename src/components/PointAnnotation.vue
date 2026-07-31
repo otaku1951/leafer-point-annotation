@@ -2375,6 +2375,10 @@ const rotateImage = async () => {
   await transformCurrentImage("rotate90");
 };
 
+const rotateImageLeft = async () => {
+  await transformCurrentImage("rotate270");
+};
+
 const flipImage = async (direction: "h" | "v" = "h") => {
   await transformCurrentImage(direction === "h" ? "flipH" : "flipV");
 };
@@ -2692,6 +2696,7 @@ defineExpose({
   clearAllAnnotationsAndBrush,
   resetCanvas,
   rotateImage,
+  rotateImageLeft,
   flipImage,
   zoomIn,
   zoomOut,

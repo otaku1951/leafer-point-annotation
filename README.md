@@ -448,6 +448,7 @@ annotationRef.value?.getMaskBlob()                // 导出当前图层 Blob（�
 | `getImageInfo()` | `{ url, width, height, isLocal, file?, metaFile? }`（`file` 为当前文件，`metaFile` 为原始未变换的文件） |
 | `resetCanvas()` | 重置画布到无图片初始化状态（清除所有标注、笔刷、撤销栈） |
 | `rotateImage()` | 顺时针旋转图片 90°（会清空所有标注和笔刷数据） |
+| `rotateImageLeft()` | 逆时针旋转图片 90°（会清空所有标注和笔刷数据） |
 | `flipImage(direction?)` | 翻转图片：`'h'` 水平翻转（默认），`'v'` 垂直翻转（会清空所有标注和笔刷数据） |
 
 > **图片旋转/翻转说明**：旋转和翻转采用简化方案——执行时先清空所有已有标注和笔刷数据，再对图片像素进行 Canvas 2D 变换并重新加载。因此建议**先调整图片方向，再开始标注**。变换后 `file` 为变换后的新 `File` 对象，`metaFile` 始终指向原始文件。
@@ -730,6 +731,7 @@ function useLasso() {
   />
   <div class="my-toolbar">
     <button @click="() => annotationRef.value?.rotateImage()">↻ 顺时针 90°</button>
+    <button @click="() => annotationRef.value?.rotateImageLeft()">↺ 逆时针 90°</button>
     <button @click="() => annotationRef.value?.flipImage('h')">⇆ 水平翻转</button>
     <button @click="() => annotationRef.value?.flipImage('v')">⇅ 垂直翻转</button>
   </div>

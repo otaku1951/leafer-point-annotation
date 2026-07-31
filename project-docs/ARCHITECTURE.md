@@ -253,6 +253,7 @@ App (leafer-ui)
 | `getImageInfo()` | 返回 `{ url, width, height, isLocal, file?, metaFile? }`（`file` 为当前文件，`metaFile` 为原始未变换的文件） |
 | `resetCanvas()` | 重置画布到无图片初始化状态（清除所有标注、笔刷、撤销栈） |
 | `rotateImage()` | 顺时针旋转图片 90°（清空所有标注和笔刷数据） |
+| `rotateImageLeft()` | 逆时针旋转图片 90°（清空所有标注和笔刷数据） |
 | `flipImage(direction?)` | 翻转图片：`'h'` 水平翻转（默认），`'v'` 垂直翻转（清空所有标注和笔刷数据） |
 | **工具切换** | |
 | `getCurrentTool()` | 返回 `'select'/'point'/'brush'/'eraser'/'lasso'` |

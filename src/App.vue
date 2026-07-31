@@ -127,6 +127,7 @@
         <p class="subtle">旋转/翻转图片会清空所有已有标注和笔刷数据（简化方案）</p>
         <div class="multi-layer-row">
           <button @click="pointAnnotation?.rotateImage()">↻ 顺时针旋转 90°</button>
+          <button @click="pointAnnotation?.rotateImageLeft()">↺ 逆时针旋转 90°</button>
           <button @click="pointAnnotation?.flipImage('h')">⇆ 水平翻转</button>
           <button @click="pointAnnotation?.flipImage('v')">⇅ 垂直翻转</button>
         </div>
